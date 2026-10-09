@@ -53,7 +53,7 @@ export function Countdown() {
     queryKey: ["event-state"],
     queryFn: async () => {
       try {
-        const response = await fetch("https://hackmitten-3-0-api.mitt.edu.in/api/event-state", {
+        const response = await fetch("/api/event-state", {
           cache: "no-store",
         });
 

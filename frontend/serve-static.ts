@@ -8,9 +8,27 @@ serve({
     
     // 1. Proxy /api and /uploads to the backend (mimicking Nginx)
     if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/uploads/")) {
-      url.port = "3001";
-      url.hostname = "127.0.0.1";
-      return fetch(new Request(url.href, req));
+      const backendOrigin = (process.env.BACKEND_API_ORIGIN ?? "https://hackmitten-3-0-api.mitt.edu.in").replace(/\/$/, "");
+      const origin = req.headers.get("origin") ?? "*";
+
+      if (req.method === "OPTIONS") {
+        const corsHeaders = new Headers();
+        corsHeaders.set("Access-Control-Allow-Origin", origin);
+        corsHeaders.set("Access-Control-Allow-Credentials", "true");
+        corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+        corsHeaders.set("Access-Control-Allow-Headers", "*");
+        corsHeaders.set("Access-Control-Max-Age", "86400");
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      const targetUrl = new URL(url.pathname + url.search, backendOrigin);
+      const res = await fetch(new Request(targetUrl.href, req));
+      const resHeaders = new Headers(res.headers);
+      resHeaders.set("Access-Control-Allow-Origin", origin);
+      resHeaders.set("Access-Control-Allow-Credentials", "true");
+      resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+      resHeaders.set("Access-Control-Allow-Headers", "*");
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers: resHeaders });
     }
 
     // 2. Serve static files from the frontend/out/ directory
@@ -41,5 +59,6 @@ serve({
   },
 });
 
+const backendOrigin = (process.env.BACKEND_API_ORIGIN ?? "https://hackmitten-3-0-api.mitt.edu.in").replace(/\/$/, "");
 console.log("Local testing server running on http://localhost:3000");
-console.log("Proxying /api traffic to http://127.0.0.1:3001");
+console.log(`Proxying /api and /uploads traffic to ${backendOrigin}`);
