@@ -30,6 +30,7 @@ export function Reveal({
     }
 
     if (typeof IntersectionObserver === "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
       return;
     }

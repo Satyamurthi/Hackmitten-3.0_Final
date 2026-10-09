@@ -112,6 +112,7 @@ function SponsorGlobe({ sponsors }: { sponsors: Sponsor[] }) {
 
   // Track container width dynamically for perfect responsiveness on mobile / resize
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     if (!containerRef.current) return;
 

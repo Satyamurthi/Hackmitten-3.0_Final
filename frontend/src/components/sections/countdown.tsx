@@ -78,6 +78,7 @@ export function Countdown() {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     setNow(Date.now());
     const timer = window.setInterval(() => {

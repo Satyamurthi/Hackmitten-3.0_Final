@@ -22,13 +22,37 @@ serve({
       }
 
       const targetUrl = new URL(url.pathname + url.search, backendOrigin);
-      const res = await fetch(new Request(targetUrl.href, req));
-      const resHeaders = new Headers(res.headers);
-      resHeaders.set("Access-Control-Allow-Origin", origin);
-      resHeaders.set("Access-Control-Allow-Credentials", "true");
-      resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
-      resHeaders.set("Access-Control-Allow-Headers", "*");
-      return new Response(res.body, { status: res.status, statusText: res.statusText, headers: resHeaders });
+      
+      const proxyHeaders = new Headers(req.headers);
+      proxyHeaders.delete("host");
+      if (proxyHeaders.has("origin")) {
+        proxyHeaders.set("origin", backendOrigin);
+      }
+      if (proxyHeaders.has("referer")) {
+        proxyHeaders.set("referer", proxyHeaders.get("referer")!.replace(new URL(req.url).origin, backendOrigin));
+      }
+      
+      const proxyReq = new Request(targetUrl.href, {
+        method: req.method,
+        headers: proxyHeaders,
+        body: req.method !== "GET" && req.method !== "HEAD" ? await req.clone().blob() : undefined,
+      });
+      
+      try {
+        const res = await fetch(proxyReq);
+        const resHeaders = new Headers(res.headers);
+        resHeaders.set("Access-Control-Allow-Origin", origin);
+        resHeaders.set("Access-Control-Allow-Credentials", "true");
+        resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+        resHeaders.set("Access-Control-Allow-Headers", "*");
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers: resHeaders });
+      } catch (err) {
+        console.error("[Proxy Error] Failed to fetch upstream:", err);
+        return new Response(JSON.stringify({ error: "Upstream Proxy Error", details: String(err) }), {
+          status: 502,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": origin },
+        });
+      }
     }
 
     // 2. Serve static files from the frontend/out/ directory
