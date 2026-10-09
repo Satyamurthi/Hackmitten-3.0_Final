@@ -20,13 +20,6 @@ out/
 # production
 /build
 
-# environment variables
-.env
-.env*.local
-.env.production
-.env.development
-!.env.example
-
 # misc
 .DS_Store
 *.pem
