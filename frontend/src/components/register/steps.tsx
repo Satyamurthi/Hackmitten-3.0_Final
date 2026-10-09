@@ -374,7 +374,8 @@ export function StepPayment() {
         const registrationForm = new FormData();
         registrationForm.append("registration", JSON.stringify({ teamName, college, members: members.map(({ participantImage: _image, ...member }) => member) }));
         members.forEach((member, index) => { if (member.participantImage) registrationForm.append(`participantImage${index}`, member.participantImage); });
-        const regRes = await fetch("/api/registrations", { method: "POST", body: registrationForm });
+        const apiOrigin = process.env.NEXT_PUBLIC_BACKEND_API_ORIGIN ?? "https://hackmitten-3-0-api.mitt.edu.in";
+        const regRes = await fetch(`${apiOrigin}/api/registrations`, { method: "POST", body: registrationForm, credentials: "include" });
         const regJson = await regRes.json().catch(() => ({}));
         if (!regRes.ok) throw new Error(regJson.error || "Registration failed");
         activeTeamId = regJson.team.id;

@@ -38,7 +38,8 @@ export default function LoginPage() {
       return;
     }
     // Decide redirect based on actual session role
-    const r = await fetch("/api/auth/session");
+    const apiOrigin = process.env.NEXT_PUBLIC_BACKEND_API_ORIGIN ?? "https://hackmitten-3-0-api.mitt.edu.in";
+    const r = await fetch(`${apiOrigin}/api/auth/session`, { credentials: "include" });
     const session = await r.json();
     const role = session?.user?.role;
     if (role === "SUPER_ADMIN") router.push("/admin");
