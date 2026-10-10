@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, CheckCircle2, Clock, ShieldCheck, UtensilsCrossed, Download } from "lucide-react";
 import Link from "next/link";
@@ -59,6 +60,8 @@ export function AdminDashboardHome() {
     refetchInterval: 15000,
   });
 
+  const [showExport, setShowExport] = useState(false);
+
   return (
     <div className="space-y-8">
       <header className="flex items-end justify-between gap-4">
@@ -69,12 +72,34 @@ export function AdminDashboardHome() {
           <h1 className="display text-3xl md:text-4xl font-bold text-white">Mission Control</h1>
           <p className="text-sm text-[#A8A8A8] mt-1">Real-time overview of Hackmitten 3.0</p>
         </div>
-        <a
-          href="/api/admin/export"
-          className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap"
-        >
-          <Download size={14} /> Export CSV
-        </a>
+        
+        <div className="relative">
+          <button
+            onClick={() => setShowExport(!showExport)}
+            className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+          
+          {showExport && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowExport(false)} />
+              <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-white/10 bg-[#0a0a0a] shadow-xl z-50 overflow-hidden">
+                <div className="p-1">
+                  <a href="/api/admin/export?type=teams" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
+                    Teams & Payments
+                  </a>
+                  <a href="/api/admin/export?type=participants" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
+                    All Participants
+                  </a>
+                  <a href="/api/admin/export?type=food" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
+                    Food Check-ins
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {queryError && <div role="alert" className="glass rounded p-3 text-sm text-[#D83A43] border-l-2 border-[#B52A32]">{queryError.message}</div>}

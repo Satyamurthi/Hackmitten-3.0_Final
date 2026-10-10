@@ -139,7 +139,10 @@ export function computeEventState(cfg: {
 export async function getEventState(
   database: Pick<typeof db, "eventConfig" | "team"> = db,
 ): Promise<EventStateInfo> {
-  const cfg = await database.eventConfig.findUnique({ where: { id: "singleton" }, select: { registrationEnabled: true, registrationLimit: true } });
+  const cfg = await database.eventConfig.findUnique({ 
+    where: { id: "singleton" }, 
+    select: { registrationEnabled: true, registrationLimit: true, eventStartDate: true, eventStartTime: true } 
+  });
   if (!cfg) {
     return {
       state: "UPCOMING",
@@ -162,6 +165,8 @@ export async function getEventState(
   return computeEventState({
     ...EVENT_STATIC,
     ...cfg,
+    eventStartDate: cfg.eventStartDate || EVENT_STATIC.eventStartDate,
+    eventStartTime: cfg.eventStartTime || EVENT_STATIC.eventStartTime,
     currentCount,
   });
 }
