@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     if (!(await hasRegistrationAccess(req, id, db))) {
-      return NextResponse.json({ error: "Registration access denied", code: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json({ error: "Registration not found", code: "NOT_FOUND" }, { status: 404 });
     }
     const parsed = paymentSubmissionSchema.safeParse(await req.json());
     if (!parsed.success || parsed.data.transactionId.trim().length < 4) {

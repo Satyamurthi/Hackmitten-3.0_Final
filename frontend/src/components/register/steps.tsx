@@ -374,7 +374,7 @@ export function StepPayment() {
         const registrationForm = new FormData();
         registrationForm.append("registration", JSON.stringify({ teamName, college, members: members.map(({ participantImage: _image, ...member }) => member) }));
         members.forEach((member, index) => { if (member.participantImage) registrationForm.append(`participantImage${index}`, member.participantImage); });
-        const regRes = await fetch("/api/registrations", { method: "POST", body: registrationForm });
+        const regRes = await fetch("/api/registrations", { method: "POST", body: registrationForm, credentials: "include" });
         const regJson = await regRes.json().catch(() => ({}));
         if (!regRes.ok) throw new Error(regJson.error || "Registration failed");
         activeTeamId = regJson.team.id;
@@ -388,10 +388,10 @@ export function StepPayment() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactionId: transactionId.trim() }),
+        credentials: "include",
       });
       const payJson = await payRes.json().catch(() => ({}));
       if (!payRes.ok) {
-        if (payRes.status === 401) throw new Error(`Payment access expired. Contact the coordinator with registration reference ${activeTeamId}.`);
         throw new Error(payJson.error || "Payment submission failed");
       }
 
@@ -400,10 +400,10 @@ export function StepPayment() {
       const upRes = await fetch(`/api/registrations/${activeTeamId}/payment-screenshot`, {
         method: "POST",
         body: form,
+        credentials: "include",
       });
       const upJson = await upRes.json().catch(() => ({}));
       if (!upRes.ok) {
-        if (upRes.status === 401) throw new Error(`Payment access expired. Contact the coordinator with registration reference ${activeTeamId}.`);
         throw new Error(upJson.error || "Screenshot upload failed");
       }
 
@@ -446,7 +446,18 @@ export function StepPayment() {
           </div>
           <div className="flex items-center justify-center">
             <div className="aspect-square w-44 max-w-full bg-white p-2 rounded">
-              <img src={qrUrl} alt="Payment QR code" className="block h-full w-full object-contain" />
+              <img
+                src={qrUrl}
+                alt="Payment QR code"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.dataset.retried) {
+                    target.dataset.retried = "true";
+                    target.src = `${qrUrl}?t=${Date.now()}`;
+                  }
+                }}
+                className="block h-full w-full object-contain"
+              />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck, Users, UtensilsCrossed } from "lucide-react";
@@ -38,8 +38,7 @@ export default function LoginPage() {
       return;
     }
     // Decide redirect based on actual session role
-    const r = await fetch("/api/auth/session");
-    const session = await r.json();
+    const session = await getSession();
     const role = session?.user?.role;
     if (role === "SUPER_ADMIN") router.push("/admin");
     else if (role === "COORDINATOR") router.push("/coordinator");

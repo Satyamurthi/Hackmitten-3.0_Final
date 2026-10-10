@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     const { id } = await params;
     if (!(await hasRegistrationAccess(req, id, db))) {
-      return NextResponse.json({ error: "Registration access denied", code: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json({ error: "Registration not found", code: "NOT_FOUND" }, { status: 404 });
     }
     const current = await db.team.findUnique({
       where: { id },
