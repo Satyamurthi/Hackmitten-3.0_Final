@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       filename = "participants";
     } else if (type === "food") {
       const checkins = await db.foodCheckIn.findMany({
-        orderBy: { timestamp: "desc" },
+        orderBy: { createdAt: "desc" },
         include: {
           meal: { select: { name: true, type: true } },
           participant: { select: { fullName: true, email: true, team: { select: { teamName: true } } } }
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       for (const c of checkins) {
         rows.push([
           c.id, c.meal.name, c.meal.type, c.participant.fullName, c.participant.email, c.participant.team.teamName,
-          c.scannedById, c.timestamp.toISOString()
+          c.checkedInById, c.createdAt.toISOString()
         ]);
       }
       csvText = csvDocument(rows);
