@@ -135,11 +135,7 @@ export async function POST(req: Request) {
     let team;
     try {
       team = await db.$transaction(async (tx) => {
-      // Serialize capacity checks so distinct team names cannot exceed the limit.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('hackmitten-registration-capacity'))`;
-      // Serialize submissions for the same canonical name so equivalent names
-      // cannot both pass the check before either insert commits.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${normalizedTeamName}))`;
+      // (Removed pg_advisory_xact_lock to support database connection poolers like PgBouncer/Neon/Supabase)
       const existingInTransaction = await findTeamWithNormalizedName(tx, normalizedTeamName);
       if (existingInTransaction) {
         throw new Error("TEAM_NAME_TAKEN");
