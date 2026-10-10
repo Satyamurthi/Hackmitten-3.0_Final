@@ -30,6 +30,9 @@ export const metadata: Metadata = {
   description:
     "24 hours. Limitless possibilities. Enter the event horizon at Hackmitten 3.0.",
   keywords: ["hackathon", "hackmitten", "innovation", "code", "build break rebuild"],
+  icons: {
+    icon: "/favicon.ico",
+  },
   openGraph: {
     title: "Hackmitten 3.0",
     description: "Ideas beyond the horizon. 24 hours of build, break, rebuild.",
