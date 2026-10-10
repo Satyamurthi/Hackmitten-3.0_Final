@@ -242,7 +242,7 @@ export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: s
   const leaderName = escapeHtml(opts.leaderName);
   const teamName = escapeHtml(opts.teamName);
   const contactEmail = opts.contactEmail ? escapeHtml(opts.contactEmail) : null;
-  return 
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -262,9 +262,9 @@ export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: s
           </tr>
           <tr>
             <td style="padding:40px;">
-              <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#F2F2F2;">Incoming transmission for <strong>\</strong>,</p>
+              <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#F2F2F2;">Incoming transmission for <strong>${leaderName}</strong>,</p>
               <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#A8A8A8;">
-                Your payment for team <strong>\</strong> has been successfully verified by our administrators.
+                Your payment for team <strong>${teamName}</strong> has been successfully verified by our administrators.
               </p>
               <div style="background:rgba(216,58,67,0.1);border:1px solid rgba(216,58,67,0.2);border-radius:8px;padding:24px;margin:32px 0;">
                 <h3 style="margin:0 0 12px;font-size:14px;color:#D83A43;text-transform:uppercase;letter-spacing:1px;">STATUS UPDATE</h3>
@@ -277,7 +277,7 @@ export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: s
           <tr>
             <td style="padding:24px 40px;background:#050505;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
               <p style="margin:0;font-size:12px;color:#666666;">
-                Need help? Contact command at <a href="mailto:\" style="color:#B52A32;text-decoration:none;">\</a>
+                Need help? Contact command at <a href="mailto:${contactEmail || 'hello@hackmitten.com'}" style="color:#B52A32;text-decoration:none;">${contactEmail || 'hello@hackmitten.com'}</a>
               </p>
             </td>
           </tr>
@@ -286,10 +286,15 @@ export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: s
     </tr>
   </table>
 </body>
-</html>;
+</html>`;
 }
 export function paymentVerifiedEmailText(opts: { leaderName: string; teamName: string; contactEmail?: string | null; }): string {
-  return \Hackmitten 3.0 - Payment Verified\n\nIncoming transmission for \,\n\nYour payment for team \ has been successfully verified.\nYour team will now be reviewed for final approval.\;
+  return `Hackmitten 3.0 - Payment Verified
+
+Incoming transmission for ${opts.leaderName},
+
+Your payment for team ${opts.teamName} has been successfully verified.
+Your team will now be reviewed for final approval.`;
 }
 export async function sendPaymentVerifiedEmail(opts: { to: string; leaderName: string; teamName: string; contactEmail?: string | null; }): Promise<EmailResult> {
   return sendEmail({
