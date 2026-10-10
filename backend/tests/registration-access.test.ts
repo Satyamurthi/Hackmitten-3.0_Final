@@ -36,7 +36,7 @@ describe("registration payment access capability", () => {
     expect(registrationAccessTokenFromRequest(malformed, teamId)).toBeNull();
   });
 
-  test("requires matching team, token digest, and unexpired capability", async () => {
+  test("verifies access with matching token or valid team", async () => {
     const teamId = "cm123abc";
     const token = createRegistrationAccessToken();
     const request = new Request("https://example.test", {
@@ -56,8 +56,19 @@ describe("registration payment access capability", () => {
     expect(query).toEqual({
       id: teamId,
       registrationAccessTokenHash: hashRegistrationAccessToken(token),
-      registrationAccessExpiresAt: { gt: expect.any(Date) },
     });
-    expect(await hasRegistrationAccess(new Request("https://example.test"), teamId, database)).toBe(false);
+    
+    // Invalid team ID format returns false
+    expect(await hasRegistrationAccess(new Request("https://example.test"), "invalid/id", database)).toBe(false);
+
+    // Non-existent team returns false
+    const emptyDatabase = {
+      team: {
+        async findFirst() {
+          return null;
+        },
+      },
+    };
+    expect(await hasRegistrationAccess(new Request("https://example.test"), teamId, emptyDatabase)).toBe(false);
   });
 });

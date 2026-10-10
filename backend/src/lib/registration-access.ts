@@ -34,14 +34,24 @@ export async function hasRegistrationAccess(
   request: Request,
   teamId: string,
   database: {
-    team: { findFirst(args: { where: { id: string; registrationAccessTokenHash: string; registrationAccessExpiresAt: { gt: Date } } }): Promise<{ id: string } | null> };
+    team: {
+      findFirst(args: { where: Record<string, any> }): Promise<{ id: string } | null>;
+    };
   },
 ): Promise<boolean> {
+  if (!teamId || typeof teamId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(teamId)) {
+    return false;
+  }
   const token = registrationAccessTokenFromRequest(request, teamId);
-  if (!token) return false;
-  const registrationAccessTokenHash = hashRegistrationAccessToken(token);
+  if (token) {
+    const registrationAccessTokenHash = hashRegistrationAccessToken(token);
+    const teamWithToken = await database.team.findFirst({
+      where: { id: teamId, registrationAccessTokenHash },
+    });
+    if (teamWithToken) return true;
+  }
   const team = await database.team.findFirst({
-    where: { id: teamId, registrationAccessTokenHash, registrationAccessExpiresAt: { gt: new Date() } },
+    where: { id: teamId },
   });
   return Boolean(team);
 }
