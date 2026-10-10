@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       const checkins = await db.foodCheckIn.findMany({
         orderBy: { createdAt: "desc" },
         include: {
-          meal: { select: { name: true, type: true } },
+          meal: { select: { label: true, type: true } },
           participant: { select: { fullName: true, email: true, team: { select: { teamName: true } } } }
         }
       });
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       ];
       for (const c of checkins) {
         rows.push([
-          c.id, c.meal.name, c.meal.type, c.participant.fullName, c.participant.email, c.participant.team.teamName,
+          c.id, c.meal.label, c.meal.type, c.participant.fullName, c.participant.email, c.participant.team.teamName,
           c.checkedInById, c.createdAt.toISOString()
         ]);
       }
