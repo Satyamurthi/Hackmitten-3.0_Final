@@ -229,9 +229,9 @@ export function StepMembers() {
                 </div>
                 <label className="md:col-span-2 block">
                   <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Participant photo (optional, JPEG / PNG / WebP, max 1 MiB)</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setMember(i, { participantImage: e.target.files?.[0] ?? null })} className="mt-2 block w-full text-xs text-[#A8A8A8]" />
+                  <input type="file" accept="image/*" onChange={(e) => setMember(i, { participantImage: e.target.files?.[0] ?? null })} className="mt-2 block w-full text-xs text-[#A8A8A8]" />
                   {m.participantImage && <span className="mt-1 block text-xs text-[#A8A8A8]">Selected: {m.participantImage.name} ({Math.ceil(m.participantImage.size / 1024)} KiB)</span>}
-                  {m.participantImage && (!["image/jpeg", "image/png", "image/webp"].includes(m.participantImage.type) || m.participantImage.size > 1024 * 1024) && (
+                  {m.participantImage && (!m.participantImage.type.startsWith("image/") || m.participantImage.size > 1024 * 1024) && (
                     <span className="mt-1 block text-xs text-[#D83A43] flex items-center gap-1.5"><AlertCircle size={12} /> Invalid format or size &gt; 1MB</span>
                   )}
                 </label>
@@ -484,7 +484,7 @@ export function StepPayment() {
         <div className="mt-2 glass rounded-lg p-4 border border-dashed border-white/15 hover:border-[#B52A32] transition-colors">
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg"
+            accept="image/*"
             onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
             className="block w-full text-xs md:text-sm text-[#A8A8A8] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#B52A32] file:text-white file:text-xs file:font-semibold file:cursor-pointer hover:file:bg-[#D83A43] cursor-pointer"
           />
@@ -493,7 +493,7 @@ export function StepPayment() {
               Selected: {screenshot.name} ({Math.round(screenshot.size / 1024)} KB)
             </div>
           )}
-          {screenshot && (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(screenshot.type) || screenshot.size > 8 * 1024 * 1024) && (
+          {screenshot && (!screenshot.type.startsWith("image/") || screenshot.size > 8 * 1024 * 1024) && (
             <div className="mt-2 text-xs text-[#D83A43] flex items-center gap-1.5">
               <AlertCircle size={12} /> Invalid format or size &gt; 8MB
             </div>

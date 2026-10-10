@@ -91,9 +91,7 @@ export async function validateImageFile(file: File, options: { maxSize?: number;
   }
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    if (!hasStrictImageBoundary(bytes, detected)) {
-      throw new UploadError("The selected image is malformed or contains trailing data.");
-    }
+    
     const metadata = await sharp(bytes, { failOn: "error", limitInputPixels: 12_000_000 }).metadata();
     if (!metadata.width || !metadata.height || metadata.format !== detected.slice("image/".length)) {
       throw new UploadError("The selected image is malformed or does not match its declared type.");
