@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchJson } from "@/lib/api-fetch";
 import { resolveSponsors } from "@/data/sponsors";
 
 type Sponsor = ReturnType<typeof resolveSponsors>[number];
