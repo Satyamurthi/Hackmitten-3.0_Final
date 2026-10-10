@@ -441,6 +441,40 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
           </div>
         </section>
       )}
+      {canApprove && (
+        <section className="glass rounded-lg p-5 border-l-2 border-red-600/50 mt-12">
+          <h2 className="mono text-[10px] uppercase tracking-widest text-red-500 mb-3">
+            Danger Zone
+          </h2>
+          <p className="text-sm text-[#A8A8A8] mb-4">
+            Permanently delete this team and all of its participants, payment records, and uploaded photos. This action cannot be undone.
+          </p>
+          <button
+            onClick={async () => {
+              if (!confirm(`Are you absolutely sure you want to permanently delete the team "${team.teamName}"?`)) return;
+              if (!confirm("This will permanently remove all participants and payment records from the database. Click OK to proceed.")) return;
+              setBusy(true); setError(null);
+              try {
+                const r = await fetch(`/api/admin/teams/${id}`, { method: "DELETE" });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || "Failed to delete team");
+                qc.invalidateQueries({ queryKey: ["admin-registrations"] });
+                qc.invalidateQueries({ queryKey: ["admin-teams"] });
+                qc.invalidateQueries({ queryKey: ["admin-stats"] });
+                window.location.href = "/admin/registrations";
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed");
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+            className="flex items-center gap-2 rounded-full border border-red-600/40 text-red-500 disabled:opacity-50 px-4 py-2 text-xs font-semibold hover:bg-red-600/10 transition-all"
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+            DELETE REGISTRATION
+          </button>
+        </section>
+      )}
     </div>
   );
 }
