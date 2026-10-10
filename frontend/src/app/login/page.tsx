@@ -39,7 +39,7 @@ export default function LoginPage() {
     }
     // Decide redirect based on actual session role
     const session = await getSession();
-    const role = session?.user?.role;
+    const role = (session?.user as any)?.role;
     if (role === "SUPER_ADMIN") router.push("/admin");
     else if (role === "COORDINATOR") router.push("/coordinator");
     else if (role === "FOOD_ADMIN") router.push("/food-admin");
