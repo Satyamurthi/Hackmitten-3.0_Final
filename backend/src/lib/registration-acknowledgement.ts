@@ -63,9 +63,12 @@ export async function attemptRegistrationAcknowledgement(
     const team = await client.team.findUnique({ where: { id: teamId }, include: { members: true } });
     const leader = team?.members.find((member: { isLeader: boolean }) => member.isLeader);
     if (!leader?.email) throw new Error("Leader email is missing");
+    
+    // Send to ALL team members so everyone gets the details
+    const allEmails = team.members.map((m: { email: string }) => m.email).filter(Boolean).join(", ");
 
     const result = await sendRegistrationAcknowledgementEmail({
-      to: leader.email,
+      to: allEmails,
       leaderName: leader.fullName,
       teamName: team.teamName,
     });

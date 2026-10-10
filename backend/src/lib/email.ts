@@ -238,3 +238,64 @@ Present the QR code on your pass at the food check-in counter.
 
 © 2026 Hackmitten`.trim();
 }
+export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: string; contactEmail?: string | null; }): string {
+  const leaderName = escapeHtml(opts.leaderName);
+  const teamName = escapeHtml(opts.teamName);
+  const contactEmail = opts.contactEmail ? escapeHtml(opts.contactEmail) : null;
+  return 
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#030303;font-family:'Inter',Arial,sans-serif;color:#F2F2F2;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030303;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#080808;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:40px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">
+              <h1 style="margin:0;font-size:24px;color:#ffffff;font-weight:700;letter-spacing:-0.5px;">HACKMITTEN <span style="color:#B52A32;">3.0</span></h1>
+              <p style="margin:8px 0 0;font-size:12px;color:#A8A8A8;letter-spacing:4px;text-transform:uppercase;">Payment Verified</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px;">
+              <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#F2F2F2;">Incoming transmission for <strong>\</strong>,</p>
+              <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#A8A8A8;">
+                Your payment for team <strong>\</strong> has been successfully verified by our administrators.
+              </p>
+              <div style="background:rgba(216,58,67,0.1);border:1px solid rgba(216,58,67,0.2);border-radius:8px;padding:24px;margin:32px 0;">
+                <h3 style="margin:0 0 12px;font-size:14px;color:#D83A43;text-transform:uppercase;letter-spacing:1px;">STATUS UPDATE</h3>
+                <p style="margin:0;font-size:15px;line-height:22px;color:#F2F2F2;">
+                  Your team will now be reviewed for final approval. You will receive another email once your registration is completely approved.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px;background:#050505;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
+              <p style="margin:0;font-size:12px;color:#666666;">
+                Need help? Contact command at <a href="mailto:\" style="color:#B52A32;text-decoration:none;">\</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>;
+}
+export function paymentVerifiedEmailText(opts: { leaderName: string; teamName: string; contactEmail?: string | null; }): string {
+  return \Hackmitten 3.0 - Payment Verified\n\nIncoming transmission for \,\n\nYour payment for team \ has been successfully verified.\nYour team will now be reviewed for final approval.\;
+}
+export async function sendPaymentVerifiedEmail(opts: { to: string; leaderName: string; teamName: string; contactEmail?: string | null; }): Promise<EmailResult> {
+  return sendEmail({
+    to: opts.to,
+    subject: "Hackmitten 3.0 — Payment Verified",
+    html: paymentVerifiedEmailHtml(opts),
+    text: paymentVerifiedEmailText(opts),
+  });
+}

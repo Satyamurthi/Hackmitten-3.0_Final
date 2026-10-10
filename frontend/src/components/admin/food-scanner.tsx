@@ -154,7 +154,7 @@ export function FoodScannerApp() {
     scannerRef.current = scanner;
     try {
       await scanner.start(
-        { facingMode: { ideal: "environment" } },
+        { facingMode: "environment" },
         { fps: 10, qrbox: { width: 240, height: 240 } },
         async (decodedText) => {
           if (scannerRef.current !== scanner) return;

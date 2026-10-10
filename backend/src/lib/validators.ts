@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const memberSchema = z.object({
-  fullName: z.string().min(2, "Full name must be at least 2 characters").max(100),
+  fullName: z.string().min(2, "Full name must be at least 2 characters").max(100).regex(/^[^\d]*$/, "Name cannot contain numbers"),
   email: z
     .string()
     .email("Invalid email")
@@ -9,7 +9,7 @@ export const memberSchema = z.object({
   phone: z
     .string()
     .regex(/^[6-9][0-9]{9}$/, "Phone must be a valid 10-digit Indian mobile number"),
-  college: z.string().min(2, "College name required").max(150),
+  college: z.string().min(2, "College name required").max(150).regex(/^[^\d]*$/, "College name cannot contain numbers"),
   degree: z.string().trim().min(1, "Degree is required").max(60),
 });
 
