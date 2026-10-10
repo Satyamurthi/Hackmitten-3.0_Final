@@ -48,9 +48,8 @@ export function useEventState() {
   return useQuery<EventStateInfo>({
     queryKey: ["event-state-info"],
     queryFn: async () => {
-      const apiOrigin = process.env.NEXT_PUBLIC_BACKEND_API_ORIGIN ?? "https://hackmitten-3-0-api.mitt.edu.in";
       try {
-        const res = await fetch(`${apiOrigin}/api/event-state`);
+        const res = await fetch("/api/event-state");
         if (!res.ok) return DEFAULT_EVENT_INFO;
         return await res.json();
       } catch {
