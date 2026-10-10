@@ -174,8 +174,13 @@ async function saveToLocal(
   mimeType: string,
 ): Promise<StoredFile> {
   if (isPrivate) {
-    await fs.mkdir(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, { recursive: true, mode: 0o700 });
-    await fs.chmod(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, 0o700);
+    try {
+      await fs.mkdir(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, { recursive: true, mode: 0o700 });
+      await fs.chmod(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, 0o700).catch(() => {});
+    } catch (e) {
+      console.error("[upload] Could not create or access private upload dir:", PRIVATE_UPLOAD_ROOT, e);
+      throw new Error(`Storage configuration error: cannot access private upload directory at ${PRIVATE_UPLOAD_ROOT}`);
+    }
 
     const abs = path.join(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, fileName);
     const buf = await file.arrayBuffer();

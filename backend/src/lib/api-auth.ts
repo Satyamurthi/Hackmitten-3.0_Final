@@ -70,8 +70,7 @@ export function jsonError(err: unknown): Response {
       { status: err.statusCode },
     );
   }
-  console.error("[api] unhandled error", {
-    name: err instanceof Error ? err.name : "UnknownError",
-  });
-  return Response.json({ error: "An unexpected error occurred.", code: "INTERNAL" }, { status: 500 });
+  console.error("[api] unhandled error:", err);
+  const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+  return Response.json({ error: message || "An unexpected error occurred.", code: "INTERNAL" }, { status: 500 });
 }

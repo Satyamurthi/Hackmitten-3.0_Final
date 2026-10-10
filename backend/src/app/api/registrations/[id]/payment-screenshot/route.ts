@@ -28,7 +28,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "This payment no longer accepts screenshots" }, { status: 409 });
     }
 
-    const form = await req.formData();
+    let form;
+    try {
+      form = await req.formData();
+    } catch (e) {
+      return NextResponse.json({ error: "Invalid form data or request body" }, { status: 400 });
+    }
     const file = form.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
@@ -81,6 +86,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await Promise.allSettled(result.oldFilePaths.map(deletePrivateFile));
     return NextResponse.json({ screenshot: result.screenshot }, { status: 201 });
   } catch (err) {
+    console.error("[payment-screenshot] Error processing upload:", err);
     if (err instanceof UploadError) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
