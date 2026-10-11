@@ -3,7 +3,7 @@
 import { useRegisterStore } from "./store";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus } from "lucide-react";
 import Link from "next/link";
 import { normalizeTeamName } from "@/lib/team-name";
 
@@ -227,14 +227,51 @@ export function StepMembers() {
                     onChange={(v) => setMember(i, { degree: v })}
                   />
                 </div>
-                <label className="md:col-span-2 block">
-                  <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Participant photo (optional, JPEG / PNG / WebP, max 1 MiB)</span>
-                  <input type="file" accept="image/*" onChange={(e) => setMember(i, { participantImage: e.target.files?.[0] ?? null })} className="mt-2 block w-full text-xs text-[#A8A8A8]" />
-                  {m.participantImage && <span className="mt-1 block text-xs text-[#A8A8A8]">Selected: {m.participantImage.name} ({Math.ceil(m.participantImage.size / 1024)} KiB)</span>}
+                <div className="md:col-span-2 space-y-2">
+                  <div className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">
+                    Participant Photo <span className="text-[#A8A8A8]/60">(Optional · JPEG / PNG / WebP · max 1 MB)</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/50 transition-colors">
+                    <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2.5 text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 min-h-[38px]">
+                      <ImagePlus size={16} />
+                      <span>Select Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setMember(i, { participantImage: e.target.files?.[0] ?? null })}
+                        className="sr-only"
+                      />
+                    </label>
+                    {m.participantImage ? (
+                      <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+                        <span className="truncate max-w-[180px] sm:max-w-[260px] font-medium">
+                          {m.participantImage.name}
+                        </span>
+                        <span className="text-[#A8A8A8]">
+                          ({Math.ceil(m.participantImage.size / 1024)} KB)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setMember(i, { participantImage: null })}
+                          className="text-[#D83A43] hover:text-white p-0.5 ml-1 transition-colors"
+                          title="Remove photo"
+                          aria-label="Remove photo"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-[#A8A8A8]/60 italic">
+                        No image selected
+                      </span>
+                    )}
+                  </div>
                   {m.participantImage && (!m.participantImage.type.startsWith("image/") || m.participantImage.size > 1024 * 1024) && (
-                    <span className="mt-1 block text-xs text-[#D83A43] flex items-center gap-1.5"><AlertCircle size={12} /> Invalid format or size &gt; 1MB</span>
+                    <div className="text-xs text-[#D83A43] flex items-center gap-1.5 mt-1">
+                      <AlertCircle size={12} /> Invalid format or size &gt; 1MB
+                    </div>
                   )}
-                </label>
+                </div>
               </div>
 
             </div>
@@ -482,17 +519,34 @@ export function StepPayment() {
           Payment Screenshot (JPEG / PNG / WebP, max 8MB)
         </span>
         <div className="mt-2 glass rounded-lg p-4 border border-dashed border-white/15 hover:border-[#B52A32] transition-colors">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
-            className="block w-full text-xs md:text-sm text-[#A8A8A8] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#B52A32] file:text-white file:text-xs file:font-semibold file:cursor-pointer hover:file:bg-[#D83A43] cursor-pointer"
-          />
-          {screenshot && (
-            <div className="mt-3 text-xs text-[#A8A8A8]">
-              Selected: {screenshot.name} ({Math.round(screenshot.size / 1024)} KB)
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2.5 text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 min-h-[38px]">
+              <ImagePlus size={16} />
+              <span>Select Screenshot Image</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+            </label>
+            {screenshot ? (
+              <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+                <span className="truncate max-w-[200px] font-medium">{screenshot.name}</span>
+                <span className="text-[#A8A8A8]">({Math.round(screenshot.size / 1024)} KB)</span>
+                <button
+                  type="button"
+                  onClick={() => setScreenshot(null)}
+                  className="text-[#D83A43] hover:text-white p-0.5 ml-1 transition-colors"
+                  title="Remove screenshot"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs text-[#A8A8A8]/60 italic">No screenshot selected</span>
+            )}
+          </div>
           {screenshot && (!screenshot.type.startsWith("image/") || screenshot.size > 8 * 1024 * 1024) && (
             <div className="mt-2 text-xs text-[#D83A43] flex items-center gap-1.5">
               <AlertCircle size={12} /> Invalid format or size &gt; 8MB

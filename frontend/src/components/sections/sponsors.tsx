@@ -5,18 +5,73 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchJson } from "@/lib/api-fetch";
 import { resolveSponsors } from "@/data/sponsors";
 
-type Sponsor = ReturnType<typeof resolveSponsors>[number];
+export interface SponsorItem {
+  id: string;
+  name: string;
+  logoUrl: string;
+  websiteUrl: string | null;
+  tier: string;
+  customTier?: string | null;
+  sortOrder?: number;
+}
+
+export function getSponsorLogoUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  if (url.startsWith("/images/")) return url;
+  const backend = (process.env.NEXT_PUBLIC_BACKEND_API_ORIGIN || "https://hackmitten-3-0-api.mitt.edu.in").replace(/\/$/, "");
+  if (url.startsWith("/api/")) return `${backend}${url}`;
+  if (url.startsWith("/")) return `${backend}${url}`;
+  return `${backend}/${url}`;
+}
 
 export function Sponsors() {
-  const sponsors = resolveSponsors();
+  const { data } = useQuery<{ sponsors?: SponsorItem[] }>({
+    queryKey: ["public-sponsors"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/sponsors");
+        if (res.ok) return await res.json();
+      } catch {}
+      const backend = (process.env.NEXT_PUBLIC_BACKEND_API_ORIGIN || "https://hackmitten-3-0-api.mitt.edu.in").replace(/\/$/, "");
+      try {
+        const res = await fetch(`${backend}/api/sponsors`);
+        if (res.ok) return await res.json();
+      } catch {}
+      return { sponsors: [] };
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const staticSponsors: SponsorItem[] = resolveSponsors();
+  const dbSponsors: SponsorItem[] = (data?.sponsors ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    logoUrl: getSponsorLogoUrl(s.logoUrl),
+    websiteUrl: s.websiteUrl ?? null,
+    tier: s.tier,
+    customTier: s.customTier ?? null,
+    sortOrder: s.sortOrder ?? 0,
+  }));
+
+  // Merge static and dynamic sponsors: dynamic sponsors take precedence by name
+  const sponsorMap = new Map<string, SponsorItem>();
+  staticSponsors.forEach((s) => sponsorMap.set(s.name.toLowerCase().trim(), s));
+  dbSponsors.forEach((s) => sponsorMap.set(s.name.toLowerCase().trim(), s));
+  const sponsors = Array.from(sponsorMap.values());
 
   if (sponsors.length === 0) return null;
 
-  const sponsorLogos = sponsors.filter((s) => s.tier !== "CUSTOM");
-  const departmentLogos = sponsors.filter((s) => s.tier === "CUSTOM");
+  // Department logos: only those marked as custom department
+  const departmentLogos = sponsors.filter(
+    (s) => s.tier === "CUSTOM" && (s.customTier?.toLowerCase().includes("department") || s.name === "CSE" || s.name === "AI&ML")
+  );
+  // All other sponsors (TITLE, PARTNER, custom sponsors) go to the 3D Globe!
+  const sponsorLogos = sponsors.filter((s) => !departmentLogos.some((d) => d.id === s.id));
 
-  const getDepartmentLogo = (department: Sponsor) => {
-    if (department.logoUrl) return department.logoUrl;
+  const getDepartmentLogo = (department: SponsorItem) => {
+    if (department.logoUrl) return getSponsorLogoUrl(department.logoUrl);
     const name = department.name.toLowerCase();
     if (name.includes("cse")) return "/images/sponsors/cse.png";
     if (name.includes("ai") || name.includes("ml")) return "/images/sponsors/aiml.png";
@@ -79,7 +134,7 @@ export function Sponsors() {
    SPONSOR GLOBE
 ================================================================ */
 
-function SponsorGlobe({ sponsors }: { sponsors: Sponsor[] }) {
+function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(500);
 
@@ -102,11 +157,10 @@ function SponsorGlobe({ sponsors }: { sponsors: Sponsor[] }) {
   const pitch = 0.42;
 
   // Responsive dimensions calculated from available container width
+  const n = Math.max(1, sponsors.length);
   const SIZE = Math.max(260, Math.min(containerWidth, 540));
   const R = Math.round(SIZE * 0.35);
-  const LOGO_MAX = Math.max(44, Math.min(92, Math.round(SIZE * 0.165)));
-
-  const n = sponsors.length;
+  const LOGO_MAX = Math.max(38, Math.min(88, Math.round((SIZE * 0.165) * (n > 5 ? Math.max(0.7, 5 / n) : 1))));
   const positions = sponsors.map((_, i) => ({
     phi: Math.acos(1 - (2 * (i + 0.5)) / n),
     theta: Math.PI * (1 + Math.sqrt(5)) * i,
@@ -280,7 +334,19 @@ function SponsorGlobe({ sponsors }: { sponsors: Sponsor[] }) {
               }}
             >
               {sponsor.logoUrl ? (
-                <img src={sponsor.logoUrl} alt={sponsor.name} draggable={false} className="h-[76%] w-[76%] object-contain" />
+                <img
+                  src={getSponsorLogoUrl(sponsor.logoUrl)}
+                  alt={sponsor.name}
+                  draggable={false}
+                  className="h-[76%] w-[76%] object-contain"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.dataset.fallback) {
+                      target.dataset.fallback = "true";
+                      target.src = sponsor.logoUrl;
+                    }
+                  }}
+                />
               ) : (
                 <span className="px-1 text-center text-[7px] sm:text-[8px] font-bold leading-tight text-black">{sponsor.name}</span>
               )}
