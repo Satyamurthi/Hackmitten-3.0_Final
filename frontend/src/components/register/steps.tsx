@@ -153,23 +153,36 @@ export function StepTeam() {
 
 export function StepMembers() {
   const { members, setMember, addMember, removeMember, next, prev } = useRegisterStore();
+  const [attemptedContinue, setAttemptedContinue] = useState(false);
 
-  const memberValid = (m: typeof members[0]) => {
-    const imgValid = !m.participantImage || (
-      ["image/jpeg", "image/png", "image/webp"].includes(m.participantImage.type) &&
-      m.participantImage.size <= 1024 * 1024
-    );
-    return m.fullName.trim().length >= 2 &&
-      m.email.toLowerCase().trim().endsWith("@gmail.com") &&
-      /^[6-9][0-9]{9}$/.test(m.phone.trim()) &&
-      m.college.trim().length >= 2 &&
-      imgValid;
+  const memberValid = (m: (typeof members)[0]) => {
+    const nameValid = m.fullName.trim().length >= 2 && !/\d/.test(m.fullName);
+    const collegeValid = m.college.trim().length >= 2 && !/\d/.test(m.college);
+    const emailValid = m.email.toLowerCase().trim().endsWith("@gmail.com");
+    const phoneValid = /^[6-9][0-9]{9}$/.test(m.phone.trim());
+    const degreeValid = m.degree.trim().length > 0;
+    const imgSelected = Boolean(m.participantImage);
+    const imgValid =
+      imgSelected &&
+      (m.participantImage!.type.startsWith("image/") ||
+        ["image/jpeg", "image/png", "image/webp"].includes(m.participantImage!.type)) &&
+      m.participantImage!.size <= 2 * 1024 * 1024;
+
+    return nameValid && collegeValid && emailValid && phoneValid && degreeValid && imgValid;
   };
 
   const allValid = members.every(memberValid);
   const emails = members.map((m) => m.email.toLowerCase().trim());
   const hasDuplicate = emails.some((e, i) => e && emails.indexOf(e) !== i);
   const valid = allValid && !hasDuplicate;
+
+  const handleContinue = () => {
+    if (!valid) {
+      setAttemptedContinue(true);
+      return;
+    }
+    next();
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -181,11 +194,56 @@ export function StepMembers() {
       <div className="space-y-4 md:space-y-6">
         {members.map((m, i) => {
           const isLeader = i === 0;
+
+          // Full Name Validation (strictly no numbers allowed)
+          const nameHasDigits = /\d/.test(m.fullName);
+          const nameTooShort = m.fullName.trim().length > 0 && m.fullName.trim().length < 2;
+          const nameError = nameHasDigits
+            ? "• Numbers are not allowed in full name"
+            : nameTooShort
+              ? "• Full name must be at least 2 characters"
+              : attemptedContinue && !m.fullName.trim()
+                ? "• Full name is required"
+                : undefined;
+
+          // College Validation (strictly required and no numbers allowed)
+          const collegeHasDigits = /\d/.test(m.college);
+          const collegeTooShort = m.college.trim().length > 0 && m.college.trim().length < 2;
+          const collegeError = collegeHasDigits
+            ? "• Numbers are not allowed in college name"
+            : collegeTooShort
+              ? "• College name must be at least 2 characters"
+              : attemptedContinue && !m.college.trim()
+                ? "• College name is required"
+                : undefined;
+
+          // Email Validation
           const emailError = m.email.trim().length > 0 && !m.email.toLowerCase().trim().endsWith("@gmail.com")
-            ? "• Enter a valid Gmail address"
+            ? "• Enter a valid Gmail address (@gmail.com)"
             : hasDuplicate && emails.indexOf(emails[i]) !== i && emails[i]
               ? "• This email is duplicated within the team"
+              : attemptedContinue && !m.email.trim()
+                ? "• Gmail address is required"
+                : undefined;
+
+          // Phone Validation
+          const phoneError = m.phone.trim().length > 0 && !/^[6-9][0-9]{9}$/.test(m.phone.trim())
+            ? "• Enter a valid 10-digit Indian mobile number"
+            : attemptedContinue && !m.phone.trim()
+              ? "• Mobile number is required"
               : undefined;
+
+          // Degree Validation
+          const degreeError = attemptedContinue && !m.degree.trim() ? "• Degree is required" : undefined;
+
+          // Image Validation
+          const imgSelected = Boolean(m.participantImage);
+          const imgTypeValid =
+            imgSelected &&
+            (m.participantImage!.type.startsWith("image/") ||
+              ["image/jpeg", "image/png", "image/webp"].includes(m.participantImage!.type));
+          const imgSizeValid = imgSelected && m.participantImage!.size <= 2 * 1024 * 1024;
+
           return (
             <div
               key={i}
@@ -217,19 +275,49 @@ export function StepMembers() {
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <Input label="Full Name" value={m.fullName} onChange={(v) => setMember(i, { fullName: v })} placeholder="Enter full name" error={m.fullName.trim().length > 0 && m.fullName.trim().length < 2 ? "• Full name must be at least 2 characters" : undefined} />
-                <Input label="Email" type="email" value={m.email} onChange={(v) => setMember(i, { email: v })} placeholder="example@gmail.com" error={emailError} />
-                <Input label="Phone" type="tel" value={m.phone} onChange={(v) => setMember(i, { phone: v })} placeholder="10 digit number" error={m.phone.trim().length > 0 && !/^[6-9][0-9]{9}$/.test(m.phone.trim()) ? "• Enter a valid Indian mobile number" : undefined} />
-                <Input label="College" value={m.college} onChange={(v) => setMember(i, { college: v })} placeholder="Enter your college / institution name" error={m.college.trim().length > 0 && m.college.trim().length < 2 ? "• College name is required" : undefined} />
+                <Input
+                  label="Full Name"
+                  value={m.fullName}
+                  onChange={(v) => setMember(i, { fullName: v })}
+                  placeholder="Enter full name"
+                  error={nameError}
+                />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={m.email}
+                  onChange={(v) => setMember(i, { email: v })}
+                  placeholder="example@gmail.com"
+                  error={emailError}
+                />
+                <Input
+                  label="Phone"
+                  type="tel"
+                  value={m.phone}
+                  onChange={(v) => setMember(i, { phone: v })}
+                  placeholder="10 digit number"
+                  error={phoneError}
+                />
+                <Input
+                  label="College"
+                  value={m.college}
+                  onChange={(v) => setMember(i, { college: v })}
+                  placeholder="Enter your college / institution name"
+                  error={collegeError}
+                />
                 <div className="md:col-span-2">
                   <DegreeField
                     value={m.degree}
                     onChange={(v) => setMember(i, { degree: v })}
+                    error={degreeError}
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <div className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">
-                    Participant Photo <span className="text-[#A8A8A8]/60">(Optional · JPEG / PNG / WebP · max 1 MB)</span>
+                  <div className="mono text-xs uppercase tracking-widest text-[#A8A8A8] flex items-center justify-between">
+                    <span>
+                      Participant Photo <span className="text-[#D83A43]">· Required</span>
+                    </span>
+                    <span className="text-[10px] text-[#A8A8A8]/60">JPEG / PNG / WebP · max 2 MB</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/50 transition-colors">
                     <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2.5 text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 min-h-[38px]">
@@ -244,6 +332,7 @@ export function StepMembers() {
                     </label>
                     {m.participantImage ? (
                       <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+                        <Check size={14} className="text-green-400" />
                         <span className="truncate max-w-[180px] sm:max-w-[260px] font-medium">
                           {m.participantImage.name}
                         </span>
@@ -260,17 +349,17 @@ export function StepMembers() {
                           <X size={14} />
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-xs text-[#A8A8A8]/60 italic">
-                        No image selected
-                      </span>
-                    )}
+                    ) : null}
                   </div>
-                  {m.participantImage && (!m.participantImage.type.startsWith("image/") || m.participantImage.size > 1024 * 1024) && (
-                    <div className="text-xs text-[#D83A43] flex items-center gap-1.5 mt-1">
-                      <AlertCircle size={12} /> Invalid format or size &gt; 1MB
+                  {!imgSelected ? (
+                    <div className="text-xs text-[#D83A43] flex items-center gap-1.5 mt-1.5">
+                      <AlertCircle size={12} /> Image is not selected. Participant photo is required.
                     </div>
-                  )}
+                  ) : !imgTypeValid || !imgSizeValid ? (
+                    <div className="text-xs text-[#D83A43] flex items-center gap-1.5 mt-1.5">
+                      <AlertCircle size={12} /> Invalid image format or size exceeds 2MB
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -288,6 +377,13 @@ export function StepMembers() {
         </button>
       )}
 
+      {!valid && (
+        <div className="mt-6 p-4 rounded-lg bg-[#B52A32]/10 border border-[#B52A32]/30 text-xs text-[#D83A43] flex items-center gap-2">
+          <AlertCircle size={16} className="shrink-0" />
+          <span>Please complete all member fields correctly (college and full name without numbers) and select a photo for every member to continue.</span>
+        </div>
+      )}
+
       <div className="mt-8 md:mt-10 flex items-center justify-between">
         <button
           onClick={prev}
@@ -297,7 +393,7 @@ export function StepMembers() {
         </button>
         <button
           disabled={!valid}
-          onClick={next}
+          onClick={handleContinue}
           className="group flex items-center gap-2 rounded-full bg-[#B52A32] disabled:opacity-30 disabled:cursor-not-allowed px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#D83A43] min-h-[44px]"
         >
           CONTINUE <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
@@ -409,7 +505,7 @@ export function StepPayment() {
       let activeTeamId = teamId;
       if (!activeTeamId) {
         const registrationForm = new FormData();
-        registrationForm.append("registration", JSON.stringify({ teamName, college, members: members.map(({ participantImage: _image, ...member }) => member) }));
+        registrationForm.append("registration", JSON.stringify({ teamName, college: members[0]?.college || "", members: members.map(({ participantImage: _image, ...member }) => member) }));
         members.forEach((member, index) => { if (member.participantImage) registrationForm.append(`participantImage${index}`, member.participantImage); });
         const regRes = await fetch("/api/registrations", { method: "POST", body: registrationForm, credentials: "include" });
         const regJson = await regRes.json().catch(() => ({}));
@@ -683,9 +779,11 @@ const DEGREE_OPTIONS = [
 function DegreeField({
   value,
   onChange,
+  error,
 }: {
   value: string;
   onChange: (v: string) => void;
+  error?: string;
 }) {
   // Determine if the current value is one of the preset options (not "Other")
   const isPreset = DEGREE_OPTIONS.includes(value) && value !== "Other";
@@ -717,6 +815,7 @@ function DegreeField({
           ))}
         </select>
       </label>
+      {error && <div className="mt-1 text-xs text-[#D83A43]">{error}</div>}
       {(isOtherSelected || selectValue === "Other") && (
         <label className="block mt-2">
           <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Specify your degree</span>

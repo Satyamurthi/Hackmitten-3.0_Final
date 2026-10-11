@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
     const contentLength = Number(req.headers.get("content-length") ?? 0);
     // Four optional participant images at 512,000 bytes each plus multipart fields.
-    if (contentLength > 4 * 512_000 + 32_768) {
+    if (contentLength > 4 * 2_097_152 + 65_536) {
       return NextResponse.json({ error: "Registration upload is too large." }, { status: 413 });
     }
     let body: unknown;
@@ -116,12 +116,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const participantImages: Array<Awaited<ReturnType<typeof storeParticipantImage>> | null> = [];
+    const participantImages: Array<Awaited<ReturnType<typeof storeParticipantImage>>> = [];
     for (let index = 0; index < members.length; index++) {
       const file = files[index];
       if (!file) {
-        participantImages.push(null);
-        continue;
+        return NextResponse.json(
+          { error: `Participant photo is required for member ${index + 1} (${members[index].fullName || "Member"}).` },
+          { status: 400 },
+        );
       }
       const stored = await storeParticipantImage(file);
       storedParticipantImages.push(stored);
