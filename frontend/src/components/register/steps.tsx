@@ -17,20 +17,18 @@ export function RegisterStepper() {
         <div key={label} className="flex items-center flex-1 last:flex-none">
           <div className="flex flex-col items-center gap-2">
             <div
-              className={`flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border text-xs font-semibold transition-all ${
-                i < step
+              className={`flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border text-xs font-semibold transition-all ${i < step
                   ? "border-[#B52A32] bg-[#B52A32] text-white"
                   : i === step
                     ? "border-[#B52A32] bg-transparent text-[#B52A32] red-glow"
                     : "border-white/15 text-[#A8A8A8]"
-              }`}
+                }`}
             >
               {i < step ? <Check size={14} /> : String(i + 1).padStart(2, "0")}
             </div>
             <span
-              className={`mono text-[9px] md:text-[10px] uppercase tracking-widest text-center ${
-                i === step ? "text-white" : "text-[#A8A8A8]"
-              }`}
+              className={`mono text-[9px] md:text-[10px] uppercase tracking-widest text-center ${i === step ? "text-white" : "text-[#A8A8A8]"
+                }`}
             >
               {label}
             </span>
@@ -38,9 +36,8 @@ export function RegisterStepper() {
           {i < STEPS.length - 1 && (
             <div className="flex-1 h-px mx-1.5 md:mx-4 bg-white/10 relative overflow-hidden">
               <div
-                className={`absolute inset-0 bg-[#B52A32] transition-transform duration-500 origin-left ${
-                  i < step ? "scale-x-100" : "scale-x-0"
-                }`}
+                className={`absolute inset-0 bg-[#B52A32] transition-transform duration-500 origin-left ${i < step ? "scale-x-100" : "scale-x-0"
+                  }`}
               />
             </div>
           )}
@@ -247,9 +244,8 @@ export function StepMembers() {
           return (
             <div
               key={i}
-              className={`glass rounded-lg p-4 md:p-5 border transition-all ${
-                isLeader ? "border-[#B52A32]/50" : "border-transparent"
-              }`}
+              className={`glass rounded-lg p-4 md:p-5 border transition-all ${isLeader ? "border-[#B52A32]/50" : "border-transparent"
+                }`}
             >
               <div className="flex items-center justify-between mb-3 md:mb-4 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
@@ -424,11 +420,10 @@ export function StepDetails() {
         <div className="mt-4 md:mt-6 space-y-3 md:space-y-4">
           {members.map((m, i) => (
             <div key={i} className="flex items-start gap-3 md:gap-4 pb-3 md:pb-4 border-b border-white/5 last:border-0 last:pb-0">
-              <div className={`flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full mono text-xs ${
-                i === 0
+              <div className={`flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full mono text-xs ${i === 0
                   ? "bg-[#B52A32] text-white"
                   : "bg-[#151515] border border-white/10 text-[#B52A32]"
-              }`}>
+                }`}>
                 {i === 0 ? <Crown size={14} /> : String(i + 1).padStart(2, "0")}
               </div>
               <div className="flex-1 min-w-0">
@@ -468,7 +463,7 @@ export function StepDetails() {
 // ─── STEP 3: PAYMENT ─────────────────────────────────────────────────────────
 
 const REGISTRATION_FEE = "₹1,000";
-const OFFICIAL_UPI_ID = "mitthandavapura.99649826@hdfcbank";
+const OFFICIAL_UPI_ID = "9364008472@kotak";
 const PAYMENT_QR = "/images/QRcode/payment-qr.png";
 
 export function StepPayment() {
