@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/api-fetch";
 
@@ -72,14 +72,25 @@ export function AdminRegistrationsList() {
   const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
+  const exportUrl = `/api/admin/export?type=payments${q ? `&q=${encodeURIComponent(q)}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}${paymentStatus ? `&paymentStatus=${encodeURIComponent(paymentStatus)}` : ""}`;
+
   return (
     <div className="space-y-6">
-      <header>
-        <div className="mono text-[10px] uppercase tracking-[0.3em] text-[#B52A32] mb-2">
-          / Registrations
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="mono text-[10px] uppercase tracking-[0.3em] text-[#B52A32] mb-2">
+            / Registrations
+          </div>
+          <h1 className="display text-3xl md:text-4xl font-bold text-white">All Teams</h1>
+          <p className="text-sm text-[#A8A8A8] mt-1">{total} total · click any row to verify payment</p>
         </div>
-        <h1 className="display text-3xl md:text-4xl font-bold text-white">All Teams</h1>
-        <p className="text-sm text-[#A8A8A8] mt-1">{total} total · click any row to verify payment</p>
+        <a
+          href={exportUrl}
+          download
+          className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap self-start sm:self-auto"
+        >
+          <Download size={14} /> Export Payments (CSV)
+        </a>
       </header>
 
       {/* Filters */}

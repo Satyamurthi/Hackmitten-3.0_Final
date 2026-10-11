@@ -153,10 +153,12 @@ export function StepMembers() {
   const { members, setMember, addMember, removeMember, next, prev } = useRegisterStore();
   const [attemptedContinue, setAttemptedContinue] = useState(false);
 
+  const GMAIL_REGEX = /^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*@gmail\.com$/i;
+
   const memberValid = (m: (typeof members)[0]) => {
     const nameValid = m.fullName.trim().length >= 2 && !/\d/.test(m.fullName);
     const collegeValid = m.college.trim().length >= 2 && !/\d/.test(m.college);
-    const emailValid = m.email.toLowerCase().trim().endsWith("@gmail.com");
+    const emailValid = GMAIL_REGEX.test(m.email.trim());
     const phoneValid = /^[6-9][0-9]{9}$/.test(m.phone.trim());
     const degreeValid = m.degree.trim().length > 0;
     const imgSelected = Boolean(m.participantImage);
@@ -216,8 +218,8 @@ export function StepMembers() {
                 : undefined;
 
           // Email Validation
-          const emailError = m.email.trim().length > 0 && !m.email.toLowerCase().trim().endsWith("@gmail.com")
-            ? "• Enter a valid Gmail address (@gmail.com)"
+          const emailError = m.email.trim().length > 0 && !GMAIL_REGEX.test(m.email.trim())
+            ? "• Enter a valid Gmail address (e.g. name@gmail.com)"
             : hasDuplicate && emails.indexOf(emails[i]) !== i && emails[i]
               ? "• This email is duplicated within the team"
               : attemptedContinue && !m.email.trim()

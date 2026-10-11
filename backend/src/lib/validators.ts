@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+export const GMAIL_REGEX = /^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*@gmail\.com$/i;
+
 export const memberSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(100).regex(/^[^\d]*$/, "Name cannot contain numbers"),
   email: z
     .string()
-    .email("Invalid email")
-    .refine((v) => v.toLowerCase().endsWith("@gmail.com"), "Email must be a @gmail.com address"),
+    .trim()
+    .regex(GMAIL_REGEX, "Email must be a valid @gmail.com address (e.g. name@gmail.com)"),
   phone: z
     .string()
     .regex(/^[6-9][0-9]{9}$/, "Phone must be a valid 10-digit Indian mobile number"),

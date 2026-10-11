@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, CheckCircle2, Clock, ShieldCheck, UtensilsCrossed, Download } from "lucide-react";
+import { Users, CheckCircle2, Clock, ShieldCheck, UtensilsCrossed, Download, X, Filter, CreditCard, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/api-fetch";
 
@@ -60,11 +60,50 @@ export function AdminDashboardHome() {
     refetchInterval: 15000,
   });
 
-  const [showExport, setShowExport] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportType, setExportType] = useState<"payments" | "food" | "teams" | "participants">("payments");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState("");
+  const [filterTeamStatus, setFilterTeamStatus] = useState("");
+  const [filterMealId, setFilterMealId] = useState("");
+  const [filterCollege, setFilterCollege] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterFromDate, setFilterFromDate] = useState("");
+  const [filterToDate, setFilterToDate] = useState("");
+
+  const resetFilters = () => {
+    setFilterPaymentStatus("");
+    setFilterTeamStatus("");
+    setFilterMealId("");
+    setFilterCollege("");
+    setFilterSearch("");
+    setFilterFromDate("");
+    setFilterToDate("");
+  };
+
+  const buildExportUrl = () => {
+    const params = new URLSearchParams();
+    params.set("type", exportType);
+    if (filterSearch.trim()) params.set("q", filterSearch.trim());
+    if (filterFromDate) params.set("from", filterFromDate);
+    if (filterToDate) params.set("to", filterToDate);
+
+    if (exportType === "payments") {
+      if (filterPaymentStatus) params.set("paymentStatus", filterPaymentStatus);
+      if (filterTeamStatus) params.set("status", filterTeamStatus);
+      if (filterCollege.trim()) params.set("college", filterCollege.trim());
+    } else if (exportType === "food") {
+      if (filterMealId) params.set("mealId", filterMealId);
+    } else if (exportType === "teams" || exportType === "participants") {
+      if (filterTeamStatus) params.set("status", filterTeamStatus);
+      if (filterCollege.trim()) params.set("college", filterCollege.trim());
+    }
+
+    return `/api/admin/export?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-8">
-      <header className="flex items-end justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="mono text-[10px] uppercase tracking-[0.3em] text-[#B52A32] mb-2">
             / Dashboard
@@ -73,34 +112,292 @@ export function AdminDashboardHome() {
           <p className="text-sm text-[#A8A8A8] mt-1">Real-time overview of Hackmitten 3.0</p>
         </div>
         
-        <div className="relative">
+        <div>
           <button
-            onClick={() => setShowExport(!showExport)}
+            onClick={() => setIsExportOpen(true)}
             className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap"
           >
-            <Download size={14} /> Export CSV
+            <Download size={14} /> Filter & Export CSV
           </button>
-          
-          {showExport && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowExport(false)} />
-              <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-white/10 bg-[#0a0a0a] shadow-xl z-50 overflow-hidden">
-                <div className="p-1">
-                  <a href="/api/admin/export?type=teams" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
-                    Teams & Payments
-                  </a>
-                  <a href="/api/admin/export?type=participants" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
-                    All Participants
-                  </a>
-                  <a href="/api/admin/export?type=food" onClick={() => setShowExport(false)} className="block w-full text-left px-3 py-2 text-xs text-white hover:bg-white/5 rounded">
-                    Food Check-ins
-                  </a>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </header>
+
+      {/* Filtered CSV Export Modal */}
+      {isExportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass border border-white/15 rounded-xl max-w-xl w-full p-6 text-white space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="mono text-[10px] uppercase tracking-[0.25em] text-[#B52A32] mb-1">
+                  Custom Data Export
+                </div>
+                <h2 className="text-xl font-bold text-white">Export Filtered CSV</h2>
+                <p className="text-xs text-[#A8A8A8] mt-0.5">
+                  Select dataset and customize filters to generate a target CSV spreadsheet.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsExportOpen(false)}
+                className="text-[#A8A8A8] hover:text-white p-1 rounded-md transition-colors"
+                aria-label="Close export dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Dataset Type Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-white/90">Dataset Type</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportType("payments")}
+                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                    exportType === "payments"
+                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <CreditCard size={14} className={exportType === "payments" ? "text-[#D83A43]" : ""} />
+                  <span>Payments</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportType("food")}
+                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                    exportType === "food"
+                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <UtensilsCrossed size={14} className={exportType === "food" ? "text-[#D83A43]" : ""} />
+                  <span>Food</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportType("teams")}
+                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                    exportType === "teams"
+                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <Users size={14} className={exportType === "teams" ? "text-[#D83A43]" : ""} />
+                  <span>Teams</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportType("participants")}
+                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                    exportType === "participants"
+                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <Users size={14} className={exportType === "participants" ? "text-[#D83A43]" : ""} />
+                  <span>Members</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Field Info Banner */}
+            <div className="bg-[#121212] border border-white/10 rounded-lg p-3 text-[11px] text-[#A8A8A8] leading-relaxed">
+              {exportType === "payments" && (
+                <span>
+                  <strong className="text-white">Fields exported:</strong> Team ID, Registration ID, Team Name, College, Leader Name/Email/Phone, Member Count, Payment ID, Transaction ID, Payment Status, Team Status, Screenshots Count, Verified By, Verified At, Registration Date.
+                </span>
+              )}
+              {exportType === "food" && (
+                <span>
+                  <strong className="text-white">Fields exported:</strong> Check-in ID, Meal ID, Meal Name, Meal Type, Meal Date, Participant ID, Participant Name, Participant Email, Participant Phone, Team ID, Team Name, College, Role, Scanned By, Checked In At.
+                </span>
+              )}
+              {exportType === "teams" && (
+                <span>
+                  <strong className="text-white">Fields exported:</strong> Team ID, Registration ID, Team Name, College, Team Status, Payment Status, Transaction ID, Member Count, Leader Info, Members List, Created At.
+                </span>
+              )}
+              {exportType === "participants" && (
+                <span>
+                  <strong className="text-white">Fields exported:</strong> Participant ID, Full Name, Email, Phone, Role, College, Year, Branch, GitHub, LinkedIn, Team ID, Team Name, Registration ID, Created At.
+                </span>
+              )}
+            </div>
+
+            {/* Filter Controls */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white/90 flex items-center gap-1.5">
+                  <Filter size={13} className="text-[#B52A32]" /> Filter Criteria
+                </span>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-[11px] text-[#A8A8A8] hover:text-white flex items-center gap-1 transition-colors"
+                >
+                  <RotateCcw size={11} /> Reset filters
+                </button>
+              </div>
+
+              {/* Dynamic Filter Rows */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {exportType === "payments" && (
+                  <>
+                    <div>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Payment Status</label>
+                      <select
+                        value={filterPaymentStatus}
+                        onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                      >
+                        <option value="">All Payment Statuses</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="VERIFIED">VERIFIED</option>
+                        <option value="REJECTED">REJECTED</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Team Status</label>
+                      <select
+                        value={filterTeamStatus}
+                        onChange={(e) => setFilterTeamStatus(e.target.value)}
+                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                      >
+                        <option value="">All Team Statuses</option>
+                        <option value="SUBMITTED">SUBMITTED</option>
+                        <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
+                        <option value="PAYMENT_VERIFIED">PAYMENT_VERIFIED</option>
+                        <option value="APPROVED">APPROVED</option>
+                        <option value="REJECTED">REJECTED</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">College Filter</label>
+                      <input
+                        type="text"
+                        value={filterCollege}
+                        onChange={(e) => setFilterCollege(e.target.value)}
+                        placeholder="e.g. MIT, Cambridge, Stanford..."
+                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {exportType === "food" && (
+                  <div>
+                    <label className="block text-[11px] text-[#A8A8A8] mb-1">Specific Meal</label>
+                    <select
+                      value={filterMealId}
+                      onChange={(e) => setFilterMealId(e.target.value)}
+                      className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                    >
+                      <option value="">All Meals</option>
+                      {data?.meals?.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label} ({m.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {(exportType === "teams" || exportType === "participants") && (
+                  <>
+                    <div>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Team Status</label>
+                      <select
+                        value={filterTeamStatus}
+                        onChange={(e) => setFilterTeamStatus(e.target.value)}
+                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                      >
+                        <option value="">All Team Statuses</option>
+                        <option value="SUBMITTED">SUBMITTED</option>
+                        <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
+                        <option value="PAYMENT_VERIFIED">PAYMENT_VERIFIED</option>
+                        <option value="APPROVED">APPROVED</option>
+                        <option value="REJECTED">REJECTED</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">College Filter</label>
+                      <input
+                        type="text"
+                        value={filterCollege}
+                        onChange={(e) => setFilterCollege(e.target.value)}
+                        placeholder="College name..."
+                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className={exportType === "food" ? "sm:col-span-1" : "sm:col-span-2"}>
+                  <label className="block text-[11px] text-[#A8A8A8] mb-1">Search Keywords</label>
+                  <input
+                    type="text"
+                    value={filterSearch}
+                    onChange={(e) => setFilterSearch(e.target.value)}
+                    placeholder={
+                      exportType === "payments"
+                        ? "Search by team name, email, phone, transaction ID..."
+                        : exportType === "food"
+                        ? "Search participant, team name, email..."
+                        : "Search by keyword..."
+                    }
+                    className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[#A8A8A8] mb-1">From Date</label>
+                  <input
+                    type="date"
+                    value={filterFromDate}
+                    onChange={(e) => setFilterFromDate(e.target.value)}
+                    className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[#A8A8A8] mb-1">To Date</label>
+                  <input
+                    type="date"
+                    value={filterToDate}
+                    onChange={(e) => setFilterToDate(e.target.value)}
+                    className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 flex items-center justify-end gap-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsExportOpen(false)}
+                className="px-4 py-2 text-xs text-[#A8A8A8] hover:text-white transition-colors"
+              >
+                Close
+              </button>
+              <a
+                href={buildExportUrl()}
+                download
+                onClick={() => setIsExportOpen(false)}
+                className="flex items-center gap-2 bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2 rounded-full text-xs font-semibold shadow-lg shadow-[#B52A32]/20 transition-all"
+              >
+                <Download size={14} /> Download Filtered CSV
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {queryError && <div role="alert" className="glass rounded p-3 text-sm text-[#D83A43] border-l-2 border-[#B52A32]">{queryError.message}</div>}
 

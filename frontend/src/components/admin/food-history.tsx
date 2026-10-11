@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, UtensilsCrossed } from "lucide-react";
+import { Search, UtensilsCrossed, Download } from "lucide-react";
 import { fetchJson } from "@/lib/api-fetch";
 
 type HistoryMeal = { id: string; label: string };
@@ -51,14 +51,23 @@ export function AdminFoodHistory() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <div className="mono text-[10px] uppercase tracking-[0.3em] text-[#B52A32] mb-2">
-          / Food Check-ins
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="mono text-[10px] uppercase tracking-[0.3em] text-[#B52A32] mb-2">
+            / Food Check-ins
+          </div>
+          <h1 className="display text-3xl md:text-4xl font-bold text-white">Food Administration</h1>
+          <p className="text-sm text-[#A8A8A8] mt-1">
+            {total} total check-ins · use the food admin scanner for live check-ins
+          </p>
         </div>
-        <h1 className="display text-3xl md:text-4xl font-bold text-white">Food Administration</h1>
-        <p className="text-sm text-[#A8A8A8] mt-1">
-          {total} total check-ins · use the food admin scanner for live check-ins
-        </p>
+        <a
+          href={`/api/admin/export?type=food${mealId ? `&mealId=${encodeURIComponent(mealId)}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+          download
+          className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap self-start sm:self-auto"
+        >
+          <Download size={14} /> Export Food CSV
+        </a>
       </header>
 
       {(mealsError || historyError) && (

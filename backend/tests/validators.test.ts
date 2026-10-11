@@ -94,6 +94,44 @@ describe("registrationSchema", () => {
     expect(res.success).toBe(false);
   });
 
+  it.each([
+    "abcd@gmail.@gmail.com",
+    "abcd@@gmail.com",
+    "abcd.@gmail.com",
+    ".abcd@gmail.com",
+    "ab..cd@gmail.com",
+    "abcd@yahoo.com",
+    "abcd@gmail.co",
+    "abcd@gmail.com.com",
+  ])("rejects malformed or non-gmail address: %s", (email) => {
+    const res = registrationSchema.safeParse({
+      teamName: "BADEMAIL",
+      members: [
+        validMember("Alice", email, true),
+        validMember("Bob", "bob@gmail.com"),
+        validMember("Carol", "carol@gmail.com"),
+      ],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it.each([
+    "abcd@gmail.com",
+    "john.doe@gmail.com",
+    "team_lead123@gmail.com".replace("_", ""),
+    "alice.bob.carol@gmail.com",
+  ])("accepts strictly valid gmail address: %s", (email) => {
+    const res = registrationSchema.safeParse({
+      teamName: "GOODEMAIL",
+      members: [
+        validMember("Alice", email, true),
+        validMember("Bob", "bob@gmail.com"),
+        validMember("Carol", "carol@gmail.com"),
+      ],
+    });
+    expect(res.success).toBe(true);
+  });
+
   it("rejects duplicate emails within team", () => {
     const res = registrationSchema.safeParse({
       teamName: "DUP",
