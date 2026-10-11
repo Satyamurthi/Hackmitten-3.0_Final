@@ -10,6 +10,7 @@ import {
   paymentSubmissionSchema,
   foodCheckInSchema,
   rejectionSchema,
+  passwordChangeSchema,
 } from "../src/lib/validators";
 
 function validMember(name: string, email: string, isLeader?: boolean) {
@@ -318,3 +319,42 @@ describe("rejectionSchema", () => {
     expect(res.success).toBe(false);
   });
 });
+
+describe("passwordChangeSchema", () => {
+  it("accepts an 8-character password like mitt2026 and username mittadmin", () => {
+    const res = passwordChangeSchema.safeParse({
+      newUsername: "mittadmin",
+      newPassword: "mitt2026",
+      recoveryKey: "recovery123",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("accepts an 8-character recovery key", () => {
+    const res = passwordChangeSchema.safeParse({
+      newUsername: "mittadmin",
+      newPassword: "mitt2026",
+      recoveryKey: "12345678",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("rejects a password shorter than 8 characters", () => {
+    const res = passwordChangeSchema.safeParse({
+      newUsername: "mittadmin",
+      newPassword: "mitt123", // 7 chars
+      recoveryKey: "recovery123",
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it("rejects weak passwords like 'password' or 'change-me'", () => {
+    const res = passwordChangeSchema.safeParse({
+      newUsername: "mittadmin",
+      newPassword: "password",
+      recoveryKey: "recovery123",
+    });
+    expect(res.success).toBe(false);
+  });
+});
+

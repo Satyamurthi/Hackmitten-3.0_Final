@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission, jsonError } from "@/lib/api-auth";
+import { generateQrToken } from "@/lib/constants";
 
 /**
  * GET /api/admin/registrations/:id — full detail incl. payment screenshots
@@ -50,6 +51,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
     if (!team) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Ensure all members have an active qrToken for food and pass check-in
+    for (const member of team.members) {
+      if (!member.qrToken) {
+        const token = generateQrToken();
+        await db.participant.update({
+          where: { id: member.id },
+          data: { qrToken: token },
+        });
+        member.qrToken = token;
+      }
+    }
+
     const safeTeam = {
       ...team,
       members: team.members.map(({ participantImagePath, ...member }) => ({

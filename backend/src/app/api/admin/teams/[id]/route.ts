@@ -4,6 +4,7 @@ import { requirePermission, jsonError } from "@/lib/api-auth";
 import { z } from "zod";
 import { deletePrivateFile } from "@/lib/upload";
 import { ADMIN_TEAM_SELECT } from "@/lib/admin-team-view";
+import { sendParticipantUpdateEmail, ParticipantUpdateChange } from "@/lib/email";
 
 /**
  * PATCH /api/admin/teams/:id
@@ -29,6 +30,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       updateData.teamName = body.teamName;
     }
     if (body.college !== undefined) updateData.college = body.college || null;
+
+    const teamNameChanged = Boolean(updateData.teamName && updateData.teamName !== team.teamName);
+    const collegeChanged = Boolean(updateData.college !== undefined && updateData.college !== team.college);
+    const effectiveTeamName = updateData.teamName || team.teamName;
+
+    const emailNotifications: Array<{
+      to: string;
+      participantName: string;
+      teamName: string;
+      changes: ParticipantUpdateChange[];
+    }> = [];
 
     // Update members if provided
     if (Array.isArray(body.members)) {
@@ -57,6 +69,54 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           { status: 409 },
         );
       }
+
+      // Collect changes per member for email notifications
+      for (const newM of parsed.data) {
+        const changes: ParticipantUpdateChange[] = [];
+        const oldM = newM.id ? team.members.find((m) => m.id === newM.id) : null;
+
+        if (teamNameChanged) {
+          changes.push({ field: "Team Name", from: team.teamName, to: effectiveTeamName });
+        }
+
+        if (oldM) {
+          if (oldM.fullName !== newM.fullName) {
+            changes.push({ field: "Full Name", from: oldM.fullName, to: newM.fullName });
+          }
+          if (oldM.email.toLowerCase() !== newM.email.toLowerCase()) {
+            changes.push({ field: "Email Address", from: oldM.email, to: newM.email });
+          }
+          if (oldM.phone !== newM.phone) {
+            changes.push({ field: "Phone Number", from: oldM.phone, to: newM.phone });
+          }
+          if (oldM.college !== newM.college) {
+            changes.push({ field: "College", from: oldM.college, to: newM.college });
+          }
+          if ((oldM.degree || "") !== (newM.degree || "")) {
+            changes.push({ field: "Degree", from: oldM.degree || "—", to: newM.degree || "—" });
+          }
+        } else {
+          changes.push({ field: "Team Membership", from: "—", to: `Added to ${effectiveTeamName}` });
+        }
+
+        if (changes.length > 0) {
+          emailNotifications.push({
+            to: newM.email.trim(),
+            participantName: newM.fullName,
+            teamName: effectiveTeamName,
+            changes,
+          });
+          if (oldM && oldM.email.toLowerCase() !== newM.email.toLowerCase()) {
+            emailNotifications.push({
+              to: oldM.email.trim(),
+              participantName: oldM.fullName,
+              teamName: effectiveTeamName,
+              changes,
+            });
+          }
+        }
+      }
+
       const removedImagePaths = team.members
         .filter((member) => !newMemberIds.includes(member.id) && member.participantImagePath)
         .map((member) => member.participantImagePath!);
@@ -102,10 +162,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await Promise.allSettled(removedImagePaths.map(deletePrivateFile));
     } else if (Object.keys(updateData).length > 0) {
       await db.team.update({ where: { id }, data: updateData });
+
+      if (teamNameChanged || collegeChanged) {
+        for (const m of team.members) {
+          const changes: ParticipantUpdateChange[] = [];
+          if (teamNameChanged) changes.push({ field: "Team Name", from: team.teamName, to: effectiveTeamName });
+          if (collegeChanged) changes.push({ field: "College", from: team.college || "—", to: updateData.college || "—" });
+          if (changes.length > 0) {
+            emailNotifications.push({
+              to: m.email.trim(),
+              participantName: m.fullName,
+              teamName: effectiveTeamName,
+              changes,
+            });
+          }
+        }
+      }
+    }
+
+    // Send notifications to updated participants
+    if (emailNotifications.length > 0) {
+      Promise.allSettled(
+        emailNotifications.map((notif) =>
+          sendParticipantUpdateEmail(notif).catch((err) => {
+            console.error("[admin/teams] Failed to send participant update email:", err);
+          })
+        )
+      );
     }
 
     const updated = await db.team.findUniqueOrThrow({ where: { id }, select: ADMIN_TEAM_SELECT });
-
 
     return NextResponse.json({ team: updated });
   } catch (err) {

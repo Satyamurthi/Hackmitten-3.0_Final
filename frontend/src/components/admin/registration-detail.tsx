@@ -3,9 +3,54 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ArrowLeft, Check, X, ShieldCheck, Loader2, ExternalLink, Crown, RotateCcw } from "lucide-react";
+import { ArrowLeft, Check, X, ShieldCheck, Loader2, ExternalLink, Crown, RotateCcw, Download, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { QRCodeCanvas } from "qrcode.react";
+import QRCode from "qrcode";
+
+async function downloadParticipantQR(fullName: string, qrToken: string, participantId?: string | null) {
+  try {
+    const qrDataUrl = await QRCode.toDataURL(qrToken, {
+      width: 500,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const W = 480;
+    const H = 540;
+    canvas.width = W;
+    canvas.height = H;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+    const qrImg = new Image();
+    qrImg.onload = () => {
+      const qrSize = 380;
+      ctx.drawImage(qrImg, (W - qrSize) / 2, 24, qrSize, qrSize);
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 18px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(fullName, W / 2, 440);
+      if (participantId) {
+        ctx.fillStyle = "#B52A32";
+        ctx.font = "bold 14px monospace";
+        ctx.fillText(`ID: ${participantId}`, W / 2, 468);
+      }
+      ctx.fillStyle = "#777777";
+      ctx.font = "11px monospace";
+      ctx.fillText("HACKMITTEN 3.0 — FOOD & CHECK-IN PASS", W / 2, participantId ? 495 : 475);
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `${fullName.replace(/\s+/g, "_")}_Pass_QR.png`;
+      a.click();
+    };
+    qrImg.src = qrDataUrl;
+  } catch (err) {
+    console.error("Failed to generate download QR", err);
+  }
+}
 
 type Team = {
   id: string;
@@ -186,10 +231,16 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
               {team.registrationId ?? "Not yet approved"}
             </div>
           </div>
-          <div className="text-right">
+          <div className="flex flex-col items-end gap-2">
             <div className={`text-sm font-semibold ${STATUS_COLORS[team.status]}`}>
               {team.status.replace(/_/g, " ")}
             </div>
+            <Link
+              href="/admin/teams"
+              className="inline-flex items-center gap-1.5 text-xs text-white/90 hover:text-white border border-white/15 hover:border-[#B52A32] rounded-full px-3 py-1 transition-all"
+            >
+              <Pencil size={11} /> Edit Team / Members
+            </Link>
           </div>
         </div>
         <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#B52A32]/30 bg-[#B52A32]/5 px-3 py-1.5">
@@ -211,43 +262,65 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
         </h2>
         <div className="space-y-3">
           {team.members.map((m, i) => (
-            <div key={m.id} className={`flex items-start gap-3 pb-3 border-b border-white/5 last:border-0 last:pb-0 ${m.isLeader ? "bg-[#B52A32]/5 -mx-2 px-2 rounded" : ""}`}>
-              {m.hasParticipantImage && <img src={`/api/admin/participants/${m.id}/image`} alt={`${m.fullName} participant photo`} className="h-16 w-16 rounded object-cover" />}
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full mono text-xs ${
-                m.isLeader ? "bg-[#B52A32] text-white" : "bg-[#151515] text-[#B52A32]"
-              }`}>
-                {m.isLeader ? <Crown size={12} /> : String(i + 1).padStart(2, "0")}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-white font-medium">
-                  {m.fullName}
-                  {m.isLeader && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-[#D83A43]">
-                      <Crown size={10} /> TEAM LEADER
-                    </span>
+            <div key={m.id} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] ${m.isLeader ? "bg-[#B52A32]/5 border-[#B52A32]/30" : ""}`}>
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                {m.hasParticipantImage && <img src={`/api/admin/participants/${m.id}/image`} alt={`${m.fullName} participant photo`} className="h-16 w-16 rounded object-cover shrink-0" />}
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full mono text-xs ${
+                  m.isLeader ? "bg-[#B52A32] text-white" : "bg-[#151515] text-[#B52A32]"
+                }`}>
+                  {m.isLeader ? <Crown size={12} /> : String(i + 1).padStart(2, "0")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-white font-medium flex items-center gap-2 flex-wrap">
+                    <span>{m.fullName}</span>
+                    {m.isLeader && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-[#D83A43] font-semibold bg-[#D83A43]/10 px-2 py-0.5 rounded">
+                        <Crown size={10} /> TEAM LEADER
+                      </span>
+                    )}
+                    {m.passVerified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-[#D83A43] font-semibold bg-white/5 px-2 py-0.5 rounded">
+                        <ShieldCheck size={10} /> PASS
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[#A8A8A8] mt-0.5">{m.email} · {m.phone}</div>
+                  <div className="text-xs text-[#A8A8A8]">{m.college}</div>
+                  {m.degree && (
+                    <div className="text-xs text-[#A8A8A8] mt-0.5">
+                      <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]/70">Degree:</span> {m.degree}
+                    </div>
                   )}
-                  {m.passVerified && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-[#D83A43]">
-                      <ShieldCheck size={10} /> PASS
-                    </span>
+                  {m.participantId && (
+                    <div className="mono text-[10px] text-[#B52A32] mt-1 font-semibold">ID: {m.participantId}</div>
+                  )}
+                  {m.qrToken && (
+                    <Link href={`/pass?token=${m.qrToken}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-[#A8A8A8] hover:text-white mt-1">
+                      <ExternalLink size={10} /> View Digital Pass Link
+                    </Link>
                   )}
                 </div>
-                <div className="text-xs text-[#A8A8A8]">{m.email} · {m.phone}</div>
-                <div className="text-xs text-[#A8A8A8]">{m.college}</div>
-                {m.degree && (
-                  <div className="text-xs text-[#A8A8A8] mt-0.5">
-                    <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]/70">Degree:</span> {m.degree}
-                  </div>
-                )}
-                {m.participantId && (
-                  <div className="mono text-[10px] text-[#B52A32] mt-1">ID: {m.participantId}</div>
-                )}
-                {m.qrToken && (
-                  <Link href={`/pass?token=${m.qrToken}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-[#A8A8A8] hover:text-white mt-1">
-                    <ExternalLink size={10} /> View Digital Pass
-                  </Link>
-                )}
               </div>
+
+              {/* QR Code in front of team member for food and checkin/checkout */}
+              {m.qrToken && (
+                <div className="flex items-center gap-3 shrink-0 self-start md:self-center bg-[#0a0a0a] border border-white/10 p-2.5 rounded-lg">
+                  <div className="bg-white p-1 rounded shrink-0">
+                    <QRCodeCanvas value={m.qrToken} size={70} level="M" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="mono text-[9px] uppercase tracking-wider text-[#A8A8A8]">Food & Pass QR</div>
+                    <button
+                      type="button"
+                      onClick={() => downloadParticipantQR(m.fullName, m.qrToken!, m.participantId)}
+                      className="inline-flex items-center gap-1.5 text-xs text-white hover:text-white bg-[#B52A32] hover:bg-[#D83A43] rounded px-2.5 py-1 font-medium transition-all shadow-sm"
+                      title="Download printable QR pass image"
+                    >
+                      <Download size={11} /> Download QR
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

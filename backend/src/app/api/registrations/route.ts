@@ -7,6 +7,7 @@ import { normalizeTeamName } from "@/lib/team-name";
 import { attemptRegistrationAcknowledgement } from "@/lib/registration-acknowledgement";
 import { deletePrivateFile, storeParticipantImage, UploadError } from "@/lib/upload";
 import { createRegistrationAccessToken, hashRegistrationAccessToken, registrationAccessCookieName, REGISTRATION_ACCESS_COOKIE_MAX_AGE_SECONDS } from "@/lib/registration-access";
+import { generateQrToken } from "@/lib/constants";
 
 type RawQueryClient = Pick<typeof db, "$queryRaw">;
 
@@ -173,6 +174,7 @@ export async function POST(req: Request) {
               phone: m.phone.trim(),
               college: m.college,
               degree: m.degree || null,
+              qrToken: generateQrToken(),
               participantImagePath: participantImages[index]?.relativePath ?? null,
               participantImageMimeType: participantImages[index]?.mimeType ?? null,
               participantImageSizeBytes: participantImages[index]?.sizeBytes ?? null,

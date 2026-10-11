@@ -67,16 +67,16 @@ export function CredentialsManager() {
         </label>
 
         <label className="block">
-          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">New Password (min 12 chars)</span>
+          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">New Password (min 8 chars)</span>
           <div className="relative">
             <input
               type={showPwd ? "text" : "password"}
               required
-              minLength={12}
+              minLength={8}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="mt-1 w-full bg-[#080808] border border-white/10 rounded px-3 py-2.5 pr-10 text-white focus:border-[#B52A32] focus:outline-none"
-              placeholder="••••••••••••"
+              placeholder="••••••••"
             />
             <button type="button" onClick={() => setShowPwd(s => !s)} className="absolute right-3 top-3.5 text-[#A8A8A8] hover:text-white">
               {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -90,10 +90,11 @@ export function CredentialsManager() {
             <input
               type={showRec ? "text" : "password"}
               required
+              minLength={8}
               value={recoveryKey}
               onChange={(e) => setRecoveryKey(e.target.value)}
-              className="mt-1 w-full bg-[#080808] border border-white/10 rounded px-3 py-2.5 pr-10 text-white focus:border-[#B52A32] focus:outline-none mono"
-              placeholder="••••••••••••••••••••"
+              className="mt-1 w-full bg-[#080808] border border-white/10 rounded px-3 py-2.5 pr-10 text-white focus:border-[#B52A32] focus:outline-none"
+              placeholder="••••••••"
             />
             <button type="button" onClick={() => setShowRec(s => !s)} className="absolute right-3 top-3.5 text-[#A8A8A8] hover:text-white">
               {showRec ? <EyeOff size={14} /> : <Eye size={14} />}

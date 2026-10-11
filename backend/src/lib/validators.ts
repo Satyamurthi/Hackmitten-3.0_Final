@@ -74,8 +74,8 @@ export const loginSchema = z.object({
 export const passwordChangeSchema = z
   .object({
     newUsername: z.string().min(4, "Username must be at least 4 characters").max(60).regex(/^[a-zA-Z0-9_.\-]+$/, "Username has invalid characters"),
-    newPassword: z.string().min(12, "Password must be at least 12 characters").max(200),
-    recoveryKey: z.string().min(10, "Recovery key required"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters").max(200),
+    recoveryKey: z.string().min(8, "Recovery key required"),
   })
   .superRefine((data, ctx) => {
     if (data.newPassword.toLowerCase() === "change-me" || data.newPassword === "password") {

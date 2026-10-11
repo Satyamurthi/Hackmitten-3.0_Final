@@ -296,7 +296,7 @@ Incoming transmission for ${opts.leaderName},
 Your payment for team ${opts.teamName} has been successfully verified.
 Your team will now be reviewed for final approval.`;
 }
-export async function sendPaymentVerifiedEmail(opts: { to: string; leaderName: string; teamName: string; contactEmail?: string | null; }): Promise<EmailResult> {
+export async function sendPaymentVerifiedEmail(opts: { leaderName: string; teamName: string; contactEmail?: string | null; to: string }): Promise<EmailResult> {
   return sendEmail({
     to: opts.to,
     subject: "Hackmitten 3.0 — Payment Verified",
@@ -304,3 +304,246 @@ export async function sendPaymentVerifiedEmail(opts: { to: string; leaderName: s
     text: paymentVerifiedEmailText(opts),
   });
 }
+
+// ─── PARTICIPANT UPDATE EMAIL ───────────────────────────────────────────────
+
+export interface ParticipantUpdateChange {
+  field: string;
+  from: string;
+  to: string;
+}
+
+export function participantUpdateEmailHtml(opts: {
+  participantName: string;
+  teamName: string;
+  changes: ParticipantUpdateChange[];
+  contactEmail?: string | null;
+}): string {
+  const participantName = escapeHtml(opts.participantName);
+  const teamName = escapeHtml(opts.teamName);
+  const contactEmail = opts.contactEmail ? escapeHtml(opts.contactEmail) : null;
+  const rows = opts.changes
+    .map(
+      (c) => `
+        <tr>
+          <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'JetBrains Mono',monospace;font-size:12px;color:#A8A8A8;">${escapeHtml(c.field)}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;color:#888888;text-decoration:line-through;">${escapeHtml(c.from || "—")}</td>
+          <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;color:#4ade80;font-weight:600;">${escapeHtml(c.to || "—")}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#030303;font-family:'Inter',Arial,sans-serif;color:#F2F2F2;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030303;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#080808;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:40px 40px 20px;text-align:center;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#B52A32;">HACKMITTEN 3.0</div>
+              <h1 style="font-size:26px;font-weight:700;color:#F2F2F2;margin:16px 0 8px;">REGISTRATION DETAILS UPDATED</h1>
+              <p style="font-size:12px;color:#A8A8A8;margin:0;">Team: ${teamName}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 40px;color:#A8A8A8;font-size:14px;line-height:1.7;">
+              <p style="margin:0 0 16px;color:#F2F2F2;">Hello ${participantName},</p>
+              <p style="margin:0 0 20px;">An event administrator has updated your registration details for Hackmitten 3.0. Here is a summary of the changes made to your profile:</p>
+              
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:24px;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#181818;">
+                    <th align="left" style="padding:10px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Field</th>
+                    <th align="left" style="padding:10px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Previous Value</th>
+                    <th align="left" style="padding:10px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Updated Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+
+              <p style="margin:0 0 12px;color:#F2F2F2;font-size:13px;">If you have any questions or did not authorize these updates, please contact the Hackmitten organizing team immediately.</p>
+              ${contactEmail ? `<p style="margin:16px 0 0;font-size:12px;">Contact: <a href="mailto:${contactEmail}" style="color:#D83A43;">${contactEmail}</a></p>` : ""}
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:11px;color:#A8A8A8;margin:24px 0 0;opacity:0.6;">© 2026 Hackmitten · Black is the universe · White is information · Red is energy</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export function participantUpdateEmailText(opts: {
+  participantName: string;
+  teamName: string;
+  changes: ParticipantUpdateChange[];
+  contactEmail?: string | null;
+}): string {
+  const diffs = opts.changes
+    .map((c) => `- ${c.field}: "${c.from || "—"}" -> "${c.to || "—"}"`)
+    .join("\n");
+
+  return `HACKMITTEN 3.0 — REGISTRATION DETAILS UPDATED
+
+Hello ${opts.participantName},
+
+An event administrator has updated your registration details for Hackmitten 3.0 (Team: ${opts.teamName}).
+Here is what was updated:
+
+${diffs}
+
+If you have any questions or did not authorize these updates, please contact the organizing team.
+${opts.contactEmail ? `Contact: ${opts.contactEmail}` : ""}
+`.trim();
+}
+
+export async function sendParticipantUpdateEmail(opts: {
+  to: string;
+  participantName: string;
+  teamName: string;
+  changes: ParticipantUpdateChange[];
+}): Promise<EmailResult> {
+  const contactEmail = process.env.SMTP_FROM || null;
+  return sendEmail({
+    to: opts.to,
+    subject: `[Hackmitten 3.0] Registration Details Updated — Team ${opts.teamName}`,
+    html: participantUpdateEmailHtml({
+      participantName: opts.participantName,
+      teamName: opts.teamName,
+      changes: opts.changes,
+      contactEmail,
+    }),
+    text: participantUpdateEmailText({
+      participantName: opts.participantName,
+      teamName: opts.teamName,
+      changes: opts.changes,
+      contactEmail,
+    }),
+  });
+}
+
+// ─── HOURLY REGISTRATION SUMMARY EMAIL ──────────────────────────────────────
+
+export interface HourlyTeamReportItem {
+  teamName: string;
+  college: string | null;
+  leaderName: string;
+  leaderEmail: string;
+  leaderPhone: string;
+  memberCount: number;
+  paymentStatus: string;
+  createdAt: string;
+}
+
+export function hourlyRegistrationReportEmailHtml(opts: {
+  teams: HourlyTeamReportItem[];
+  windowMinutes?: number;
+}): string {
+  const count = opts.teams.length;
+  const rows = opts.teams
+    .map(
+      (t) => `
+        <tr>
+          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;color:#FFFFFF;font-weight:600;">${escapeHtml(t.teamName)}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;color:#A8A8A8;">${escapeHtml(t.college || "—")}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;color:#F2F2F2;">
+            ${escapeHtml(t.leaderName)}<br>
+            <span style="font-size:11px;color:#888888;">${escapeHtml(t.leaderEmail)} · ${escapeHtml(t.leaderPhone)}</span>
+          </td>
+          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;color:#A8A8A8;text-align:center;">${t.memberCount}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'JetBrains Mono',monospace;font-size:11px;color:${
+            t.paymentStatus === "VERIFIED" ? "#4ade80" : "#facc15"
+          };">${escapeHtml(t.paymentStatus)}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#030303;font-family:'Inter',Arial,sans-serif;color:#F2F2F2;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030303;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="700" cellpadding="0" cellspacing="0" style="background:#080808;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 16px;text-align:center;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#B52A32;">HACKMITTEN 3.0 · AUTOMATED ALERT</div>
+              <h1 style="font-size:24px;font-weight:700;color:#F2F2F2;margin:12px 0 6px;">Hourly Registration Report</h1>
+              <p style="font-size:13px;color:#A8A8A8;margin:0;">
+                <strong style="color:#D83A43;">${count}</strong> new team registration${count > 1 ? "s" : ""} received in the last hour.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#181818;">
+                    <th align="left" style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Team</th>
+                    <th align="left" style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">College</th>
+                    <th align="left" style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Leader</th>
+                    <th align="center" style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Members</th>
+                    <th align="left" style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A8A8A8;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+
+              <div style="margin-top:24px;text-align:center;">
+                <p style="font-size:12px;color:#888888;margin:0 0 12px;">Review teams and verify payments on the Mission Control dashboard:</p>
+                <a href="https://hackmitten-3-0.mitt.edu.in/admin/registrations" style="display:inline-block;background:#B52A32;color:#FFFFFF;text-decoration:none;font-size:12px;font-weight:600;padding:10px 24px;border-radius:20px;">
+                  Open Admin Registrations →
+                </a>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:11px;color:#A8A8A8;margin:24px 0 0;opacity:0.6;">© 2026 Hackmitten · Automated Operations Monitor</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export async function sendHourlyRegistrationReportEmail(opts: {
+  to: string;
+  teams: HourlyTeamReportItem[];
+}): Promise<EmailResult> {
+  const count = opts.teams.length;
+  const textSummary = opts.teams
+    .map(
+      (t) =>
+        `- ${t.teamName} (${t.college || "N/A"}) | Leader: ${t.leaderName} (${t.leaderEmail}, ${t.leaderPhone}) | Members: ${t.memberCount} | Payment: ${t.paymentStatus}`
+    )
+    .join("\n");
+
+  return sendEmail({
+    to: opts.to,
+    subject: `[Hackmitten 3.0] Hourly Registration Alert: ${count} New Team${count > 1 ? "s" : ""} Registered`,
+    html: hourlyRegistrationReportEmailHtml({ teams: opts.teams }),
+    text: `HACKMITTEN 3.0 HOURLY REGISTRATION REPORT\n\n${count} new team(s) registered in the last hour:\n\n${textSummary}\n\nDashboard: https://hackmitten-3-0.mitt.edu.in/admin/registrations`,
+  });
+}
+

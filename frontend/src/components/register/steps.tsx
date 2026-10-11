@@ -475,7 +475,7 @@ export function StepDetails() {
 
 const REGISTRATION_FEE = "₹1,000";
 const OFFICIAL_UPI_ID = "9364008472@kotak";
-const PAYMENT_QR = "/images/QRcode/payment-qr.png";
+const PAYMENT_QR = "/api/payment-qr";
 
 export function StepPayment() {
   const {
