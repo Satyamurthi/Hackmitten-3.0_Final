@@ -1,0 +1,50 @@
+{
+  "info": {
+    "name": "Hackmitten API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register Team",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "registration",
+              "value": "{\"teamName\":\"PostmanTest1\",\"college\":\"Test College\",\"members\":[{\"fullName\":\"Alice\",\"email\":\"alice1@test.com\",\"phone\":\"1234567890\",\"college\":\"Test College\",\"degree\":\"BTech\",\"isLeader\":true},{\"fullName\":\"Bob\",\"email\":\"bob1@test.com\",\"phone\":\"0987654321\",\"college\":\"Test College\",\"degree\":\"BTech\",\"isLeader\":false}]}",
+              "type": "text"
+            },
+            {
+              "key": "participantImage0",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "participantImage1",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://hackmitten-3-0-api.mitt.edu.in/api/registrations",
+          "protocol": "https",
+          "host": [
+            "hackmitten-3-0-api",
+            "mitt",
+            "edu",
+            "in"
+          ],
+          "path": [
+            "api",
+            "registrations"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

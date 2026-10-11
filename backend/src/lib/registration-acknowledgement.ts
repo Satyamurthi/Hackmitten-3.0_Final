@@ -64,15 +64,22 @@ export async function attemptRegistrationAcknowledgement(
     const leader = team?.members.find((member: { isLeader: boolean }) => member.isLeader);
     if (!leader?.email) throw new Error("Leader email is missing");
     
-    // Send to ALL team members so everyone gets the details
-    const allEmails = team.members.map((m: { email: string }) => m.email).filter(Boolean).join(", ");
-
-    const result = await sendRegistrationAcknowledgementEmail({
-      to: allEmails,
-      leaderName: leader.fullName,
-      teamName: team.teamName,
-    });
-    if (!result.success) throw new Error("Email provider did not accept the acknowledgement");
+    // Send to ALL team members so everyone gets the details individually
+    const membersWithEmail = (team?.members || []).filter((m: { email: string }) => Boolean(m.email));
+    let anySent = false;
+    for (const member of membersWithEmail) {
+      try {
+        const result = await sendRegistrationAcknowledgementEmail({
+          to: member.email,
+          leaderName: member.fullName || leader.fullName,
+          teamName: team.teamName,
+        });
+        if (result.success) anySent = true;
+      } catch (err) {
+        console.error(`[registration-acknowledgement] failed for ${member.email}`, err);
+      }
+    }
+    if (!anySent) throw new Error("Email provider did not accept the acknowledgement");
 
     await completeRegistrationAcknowledgement(client, teamId, claimedAt);
     return true;

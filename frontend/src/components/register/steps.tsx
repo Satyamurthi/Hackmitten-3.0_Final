@@ -3,7 +3,7 @@
 import { useRegisterStore } from "./store";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus } from "lucide-react";
+import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus, Mail } from "lucide-react";
 import Link from "next/link";
 import { normalizeTeamName } from "@/lib/team-name";
 import { compressImage } from "@/lib/image-compress";
@@ -724,9 +724,75 @@ export function StepPayment() {
 
 export function StepSubmit() {
   const { teamId, teamName, acknowledgementEmailSent, reset } = useRegisterStore();
+  const [showEmailModal, setShowEmailModal] = useState(true);
 
   return (
-    <div className="max-w-2xl mx-auto text-center">
+    <div className="max-w-2xl mx-auto text-center relative">
+      {/* ─── POPUP MODAL FOR SPAM / INBOX ALERT ─── */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-2xl border border-[#B52A32] bg-[#0A0A0A] p-6 md:p-8 text-left shadow-[0_0_50px_rgba(181,42,50,0.35)]">
+            <button
+              onClick={() => setShowEmailModal(false)}
+              className="absolute top-4 right-4 text-[#A8A8A8] hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
+              aria-label="Close notification"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#B52A32]/20 border border-[#B52A32] text-[#D83A43]">
+                <Mail size={24} />
+              </div>
+              <div>
+                <span className="mono text-[10px] uppercase tracking-widest text-[#B52A32] font-semibold">
+                  Important Notice
+                </span>
+                <h3 className="display text-xl md:text-2xl font-bold text-white">
+                  Check Inbox & Spam Folder!
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-sm text-[#CCCCCC] leading-relaxed">
+              <p>
+                A registration confirmation email has been dispatched for team <strong className="text-white">{teamName}</strong>.
+              </p>
+              <div className="rounded-xl bg-[#151515] border border-white/10 p-4 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-[#B52A32] font-bold text-base mt-[-2px]">•</span>
+                  <p className="text-xs md:text-sm">
+                    <strong>Check both folders:</strong> Depending on your email provider, the automated mail might arrive in your <span className="text-[#D83A43] font-semibold">Spam / Junk</span> folder.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-[#B52A32] font-bold text-base mt-[-2px]">•</span>
+                  <p className="text-xs md:text-sm">
+                    <strong>If received in Spam:</strong> Please open the message and click <span className="text-emerald-400 font-semibold">&quot;Report not spam&quot;</span> or <span className="text-emerald-400 font-semibold">&quot;Move to Inbox&quot;</span> to accept it as normal mail.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-[#B52A32] font-bold text-base mt-[-2px]">•</span>
+                  <p className="text-xs md:text-sm">
+                    Doing this guarantees that your team receives the <span className="text-white font-medium">Digital QR Passes</span> and official WhatsApp group invitations upon admin approval!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-6 py-3 text-sm font-semibold transition-all shadow-lg min-h-[44px]"
+              >
+                <Check size={16} /> I Understand, I Will Check Inbox & Spam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-center mb-6">
         <div className="h-16 w-16 rounded-full bg-[#B52A32] flex items-center justify-center red-glow">
           <Check size={28} className="text-white" />
@@ -738,19 +804,30 @@ export function StepSubmit() {
       </p>
       {acknowledgementEmailSent ? (
         <p className="text-sm md:text-base text-[#A8A8A8] mb-2">
-          A confirmation email has been sent to the team leader&apos;s email address.
+          Confirmation emails have been dispatched to all team members.
         </p>
       ) : (
         <p className="text-sm md:text-base text-[#A8A8A8] mb-2">
-          Your registration has been recorded. We were unable to send the confirmation email right now. Please keep your registration details.
+          Your registration has been recorded. Please keep your reference details safe.
         </p>
       )}
-      <p className="text-sm md:text-base text-[#A8A8A8] mb-10">
-        The super admin will verify your payment shortly. Once approved, you will receive a unique registration ID and your crew will be issued digital passes with QR credentials for the food check-in system.
-      </p>
+
+      {/* ─── PERSISTENT IN-PAGE EMAIL NOTIFICATION CARD ─── */}
+      <div className="my-6 rounded-xl border border-[#B52A32]/50 bg-[#B52A32]/10 p-5 text-left md:p-6 text-sm">
+        <div className="flex items-center gap-2.5 mb-2 text-[#D83A43] font-semibold">
+          <Mail size={18} />
+          <span className="mono text-xs uppercase tracking-wider">Email Check Alert (Inbox & Spam)</span>
+        </div>
+        <p className="text-[#DDDDDD] text-xs md:text-sm leading-relaxed mb-2">
+          Please check both your <strong>Inbox</strong> and your <strong>Spam / Junk folder</strong>. If the email arrived in Spam, please open it and click <strong>&quot;Report not spam&quot;</strong> or <strong>&quot;Move to Inbox&quot;</strong> to accept it as normal mail.
+        </p>
+        <p className="text-[#A8A8A8] text-xs leading-relaxed">
+          The super admin will verify your payment shortly. Once approved, all team members will receive their personalized digital pass QR token and WhatsApp group link.
+        </p>
+      </div>
 
       {teamId && (
-        <div className="glass rounded-lg p-6 mb-10">
+        <div className="glass rounded-lg p-6 mb-8">
           <div className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">Reference</div>
           <div className="mono text-sm md:text-lg text-[#B52A32] mt-1 select-all break-all">{teamId}</div>
         </div>
