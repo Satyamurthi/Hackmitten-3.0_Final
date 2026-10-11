@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus } from "lucide-react";
 import Link from "next/link";
 import { normalizeTeamName } from "@/lib/team-name";
+import { compressImage } from "@/lib/image-compress";
 
 const STEPS = ["TEAM", "MEMBERS", "DETAILS", "PAYMENT", "SUBMIT"];
 
@@ -163,7 +164,7 @@ export function StepMembers() {
       imgSelected &&
       (m.participantImage!.type.startsWith("image/") ||
         ["image/jpeg", "image/png", "image/webp"].includes(m.participantImage!.type)) &&
-      m.participantImage!.size <= 2 * 1024 * 1024;
+      m.participantImage!.size <= 5 * 1024 * 1024;
 
     return nameValid && collegeValid && emailValid && phoneValid && degreeValid && imgValid;
   };
@@ -239,7 +240,7 @@ export function StepMembers() {
             imgSelected &&
             (m.participantImage!.type.startsWith("image/") ||
               ["image/jpeg", "image/png", "image/webp"].includes(m.participantImage!.type));
-          const imgSizeValid = imgSelected && m.participantImage!.size <= 2 * 1024 * 1024;
+          const imgSizeValid = imgSelected && m.participantImage!.size <= 5 * 1024 * 1024;
 
           return (
             <div
@@ -313,7 +314,7 @@ export function StepMembers() {
                     <span>
                       Participant Photo <span className="text-[#D83A43]">· Required</span>
                     </span>
-                    <span className="text-[10px] text-[#A8A8A8]/60">JPEG / PNG / WebP · max 2 MB</span>
+                    <span className="text-[10px] text-[#A8A8A8]/60">JPEG / PNG / WebP · Auto-optimized</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/50 transition-colors">
                     <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2.5 text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 min-h-[38px]">
@@ -322,7 +323,15 @@ export function StepMembers() {
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setMember(i, { participantImage: e.target.files?.[0] ?? null })}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const compressed = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
+                            setMember(i, { participantImage: compressed });
+                          } else {
+                            setMember(i, { participantImage: null });
+                          }
+                        }}
                         className="sr-only"
                       />
                     </label>
@@ -353,7 +362,7 @@ export function StepMembers() {
                     </div>
                   ) : !imgTypeValid || !imgSizeValid ? (
                     <div className="text-xs text-[#D83A43] flex items-center gap-1.5 mt-1.5">
-                      <AlertCircle size={12} /> Invalid image format or size exceeds 2MB
+                      <AlertCircle size={12} /> Invalid image format or size exceeds 5MB
                     </div>
                   ) : null}
                 </div>
@@ -501,10 +510,23 @@ export function StepPayment() {
       if (!activeTeamId) {
         const registrationForm = new FormData();
         registrationForm.append("registration", JSON.stringify({ teamName, college: members[0]?.college || "", members: members.map(({ participantImage: _image, ...member }) => member) }));
-        members.forEach((member, index) => { if (member.participantImage) registrationForm.append(`participantImage${index}`, member.participantImage); });
+        for (let index = 0; index < members.length; index++) {
+          const member = members[index];
+          if (member.participantImage) {
+            const imgToUpload = member.participantImage.size > 250 * 1024
+              ? await compressImage(member.participantImage, { maxWidth: 800, maxHeight: 800, quality: 0.82 })
+              : member.participantImage;
+            registrationForm.append(`participantImage${index}`, imgToUpload);
+          }
+        }
         const regRes = await fetch("/api/registrations", { method: "POST", body: registrationForm, credentials: "include" });
         const regJson = await regRes.json().catch(() => ({}));
-        if (!regRes.ok) throw new Error(regJson.error || "Registration failed");
+        if (!regRes.ok) {
+          if (regRes.status === 413) {
+            throw new Error("Registration payload exceeds server limits. Please select smaller images and retry.");
+          }
+          throw new Error(regJson.error || "Registration failed");
+        }
         activeTeamId = regJson.team.id;
         setTeamId(activeTeamId);
         setAcknowledgementEmailSent(regJson.acknowledgementEmailSent === true);
@@ -524,7 +546,10 @@ export function StepPayment() {
       }
 
       const form = new FormData();
-      form.append("file", screenshot!);
+      const screenshotToUpload = screenshot && screenshot.size > 500 * 1024
+        ? await compressImage(screenshot, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 })
+        : screenshot!;
+      form.append("file", screenshotToUpload);
       const upRes = await fetch(`/api/registrations/${activeTeamId}/payment-screenshot`, {
         method: "POST",
         body: form,
@@ -532,6 +557,9 @@ export function StepPayment() {
       });
       const upJson = await upRes.json().catch(() => ({}));
       if (!upRes.ok) {
+        if (upRes.status === 413) {
+          throw new Error("Screenshot file exceeds server limits. Please select a smaller screenshot and retry.");
+        }
         throw new Error(upJson.error || "Screenshot upload failed");
       }
 
@@ -607,7 +635,7 @@ export function StepPayment() {
 
       <label className="block">
         <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-          Payment Screenshot (JPEG / PNG / WebP, max 8MB)
+          Payment Screenshot (JPEG / PNG / WebP · Auto-optimized)
         </span>
         <div className="mt-2 glass rounded-lg p-4 border border-dashed border-white/15 hover:border-[#B52A32] transition-colors">
           <div className="flex flex-wrap items-center gap-3">
@@ -617,7 +645,15 @@ export function StepPayment() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 });
+                    setScreenshot(compressed);
+                  } else {
+                    setScreenshot(null);
+                  }
+                }}
                 className="sr-only"
               />
             </label>

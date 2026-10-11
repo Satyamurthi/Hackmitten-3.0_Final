@@ -61,8 +61,8 @@ export async function POST(req: Request) {
     }
 
     const contentLength = Number(req.headers.get("content-length") ?? 0);
-    // Four optional participant images at 512,000 bytes each plus multipart fields.
-    if (contentLength > 4 * 2_097_152 + 65_536) {
+    // Support multipart registrations with member avatars and metadata
+    if (contentLength > 25 * 1024 * 1024) {
       return NextResponse.json({ error: "Registration upload is too large." }, { status: 413 });
     }
     let body: unknown;

@@ -8,7 +8,7 @@ import { hasRegistrationAccess } from "@/lib/registration-access";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const contentLength = Number(req.headers.get("content-length") || 0);
-    if (contentLength > 9 * 1024 * 1024) {
+    if (contentLength > 15 * 1024 * 1024) {
       return NextResponse.json({ error: "Upload exceeds the request size limit." }, { status: 413 });
     }
     const { id } = await params;
