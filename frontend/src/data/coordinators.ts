@@ -98,7 +98,7 @@ export const COORDINATORS: StaticCoordinator[] = [
     department: "CSE",
     type: "STUDENT",
     image: "/images/coordinators/kishore.jpeg",
-    email: "kishkeerthi274@gmail.com",
+    email: "kishkeerthi24@gmail.com",
     phone: "7348928249",
   },
 
