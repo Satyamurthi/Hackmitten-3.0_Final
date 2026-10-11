@@ -118,48 +118,50 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       // Wait for the provider attempt, but do not roll back committed approval
       // state when delivery is unavailable or rejected.
       const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "";
-      const leader = await db.participant.findFirst({
-        where: { teamId: id, isLeader: true },
-        select: { email: true, qrToken: true, fullName: true, participantId: true },
+      const allMembers = await db.participant.findMany({
+        where: { teamId: id },
+        select: { email: true, qrToken: true, fullName: true, participantId: true, isLeader: true },
       });
-      let emailResult: EmailResult = { success: false, message: "Leader email or pass is missing", provider: "configuration" };
-      if (!leader?.email || !leader.qrToken || !baseUrl) {
-        console.error("[approval-email] delivery skipped", {
-          teamId: id,
-          reason: !baseUrl ? "NEXTAUTH_URL is missing" : "Leader email or pass is missing",
-        });
+
+      let anySent = false;
+      if (!baseUrl) {
+        console.error("[approval-email] delivery skipped: NEXTAUTH_URL is missing", { teamId: id });
       } else {
-        const passUrl = `${baseUrl}/pass/${leader.qrToken}`;
-        emailResult = await sendEmail({
-          to: leader.email,
-          subject: "Hackmitten 3.0 — Team Approved",
-          html: approvalEmailHtml({
-            participantName: leader.fullName,
-            teamName: team.teamName,
-            registrationId: regId,
-            participantId: leader.participantId ?? "",
-            passUrl,
-            whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
-          }),
-          text: approvalEmailText({
-            participantName: leader.fullName,
-            teamName: team.teamName,
-            registrationId: regId,
-            participantId: leader.participantId ?? "",
-            passUrl,
-            whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
-          }),
-        });
-        if (emailResult.success) {
+        for (const member of allMembers) {
+          if (!member.email || !member.qrToken) continue;
+          const passUrl = `${baseUrl}/pass/${member.qrToken}`;
+          try {
+            const emailResult = await sendEmail({
+              to: member.email,
+              subject: "Hackmitten 3.0 — Team Approved",
+              html: approvalEmailHtml({
+                participantName: member.fullName,
+                teamName: team.teamName,
+                registrationId: regId,
+                participantId: member.participantId ?? "",
+                passUrl,
+                whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+              }),
+              text: approvalEmailText({
+                participantName: member.fullName,
+                teamName: team.teamName,
+                registrationId: regId,
+                participantId: member.participantId ?? "",
+                passUrl,
+                whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+              }),
+            });
+            if (emailResult.success) anySent = true;
+          } catch (err) {
+            console.error(`[approval-email] delivery failed for ${member.email}`, err);
+          }
+        }
+
+        if (anySent) {
           await db.team.updateMany({ where: { id, status: "APPROVED", approvalEmailSentAt: null }, data: { approvalEmailSentAt: new Date() } });
-        } else {
-          console.error("[approval-email] delivery failed", {
-            teamId: id,
-            provider: emailResult.provider,
-          });
         }
       }
-      return NextResponse.json({ team: result.team, emailSent: emailResult.success });
+      return NextResponse.json({ team: result.team, emailSent: anySent });
     } else {
       console.log("[approval-email] duplicate suppressed", { teamId: id, reason: "re-approval" });
     }

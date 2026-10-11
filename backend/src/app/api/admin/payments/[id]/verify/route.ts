@@ -15,7 +15,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (!payment) return NextResponse.json({ error: "Payment not found" }, { status: 404 });
 
     const result = await db.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payment.teamId}))`;
       const current = await tx.payment.findUnique({
         where: { id },
         include: { team: { select: { status: true, teamName: true, members: { select: { isLeader: true, fullName: true, email: true } } } }, _count: { select: { screenshots: true } } },
@@ -40,7 +39,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         data: { status: "PAYMENT_VERIFIED" },
       });
       const leader = current.team.members?.find((m) => m.isLeader);
-      return { kind: "ok", payment: updated, teamName: current.team.teamName, leaderName: leader?.fullName, leaderEmail: leader?.email } as const;
+      return {
+        kind: "ok",
+        payment: updated,
+        teamName: current.team.teamName,
+        leaderName: leader?.fullName || "Team Leader",
+        members: current.team.members || [],
+      } as const;
     });
 
     if (result.kind === "missing") return NextResponse.json({ error: "Payment not found" }, { status: 404 });
@@ -48,8 +53,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (result.kind === "approved") return NextResponse.json({ error: "Approved teams cannot have their payment changed" }, { status: 409 });
     if (result.kind === "stale") return NextResponse.json({ error: "Payment is no longer pending review" }, { status: 409 });
     if (result.kind === "noProof") return NextResponse.json({ error: "Payment proof is required before verification" }, { status: 400 });
-    if (result.leaderEmail) {
-      sendPaymentVerifiedEmail({ to: result.leaderEmail, leaderName: result.leaderName || "Leader", teamName: result.teamName || "Team" }).catch((err) => console.error("Payment email failed", err));
+    // Send payment verified email to ALL team members
+    for (const member of result.members) {
+      if (member.email) {
+        sendPaymentVerifiedEmail({
+          to: member.email,
+          leaderName: member.fullName || result.leaderName || "Participant",
+          teamName: result.teamName || "Team",
+        }).catch((err) => console.error(`Payment email failed for ${member.email}`, err));
+      }
     }
     return NextResponse.json({ payment: result.payment });
   } catch (err) {
