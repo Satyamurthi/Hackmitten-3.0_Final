@@ -18,6 +18,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         registrationId: true,
         status: true,
         college: true,
+        degree: true,
+        domainId: true,
+        domainName: true,
+        domain: { select: { id: true, name: true, degrees: true } },
         createdAt: true,
         members: {
           select: {

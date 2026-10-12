@@ -23,6 +23,8 @@ export const registrationSchema = z
       .max(60, "Team name too long")
       .regex(/^[a-zA-Z0-9 _\-.]+$/, "Team name has invalid characters"),
     college: z.string().max(150).optional().or(z.literal("")),
+    degree: z.enum(["Diploma", "UG", "PG"]).optional(),
+    domainId: z.string().optional(),
     members: z.array(memberSchema).min(3, "Minimum 3 members required").max(4, "Maximum 4 members allowed"),
   })
   .superRefine((data, ctx) => {

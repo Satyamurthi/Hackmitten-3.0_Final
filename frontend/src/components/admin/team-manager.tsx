@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck, ExternalLink, CheckCircle2, RotateCcw } from "lucide-react";
 import { fetchJson } from "@/lib/api-fetch";
 import { compressImage } from "@/lib/image-compress";
 
@@ -12,6 +12,9 @@ type Team = {
   registrationId: string | null;
   status: string;
   college: string | null;
+  degree?: string | null;
+  domainId?: string | null;
+  domainName?: string | null;
   createdAt: string;
   members: {
     id: string;
@@ -123,7 +126,19 @@ export function TeamManager() {
                 </span>
               </div>
               {team.college && <div className="text-xs text-[#A8A8A8] truncate">{team.college}</div>}
-              <div className="mt-2 text-xs text-[#A8A8A8]">{team.members.length} members</div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {team.degree && (
+                  <span className="mono text-[10px] bg-[#B52A32]/20 border border-[#B52A32]/40 text-white px-2 py-0.5 rounded font-semibold">
+                    {team.degree}
+                  </span>
+                )}
+                {team.domainName && (
+                  <span className="mono text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-medium">
+                    {team.domainName}
+                  </span>
+                )}
+                <span className="text-[11px] text-[#A8A8A8] ml-auto">{team.members.length} members</span>
+              </div>
               <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
                 <button
                   onClick={() => setEditing(team)}
@@ -225,6 +240,34 @@ function TeamFormModal({
   const isEdit = !!team;
   const [teamName, setTeamName] = useState(team?.teamName ?? "");
   const [college, setCollege] = useState(team?.college ?? "");
+  const [degree, setDegree] = useState<"Diploma" | "UG" | "PG" | "">(
+    (team?.degree as any) ?? ""
+  );
+  const [domainId, setDomainId] = useState<string>(team?.domainId ?? "");
+
+  const { data: domainsData, isLoading: domainsLoading } = useQuery<{
+    domains: Array<{ id: string; name: string; degrees: string[] }>;
+  }>({
+    queryKey: ["admin-domains-for-degree", degree],
+    queryFn: async () => {
+      if (!degree) return { domains: [] };
+      const r = await fetch(`/api/domains?degree=${encodeURIComponent(degree)}`);
+      if (!r.ok) return { domains: [] };
+      return r.json();
+    },
+    enabled: Boolean(degree),
+  });
+  const availableDomains = domainsData?.domains || [];
+
+  // When degree is changed during editing, reset domainId if not valid for new degree
+  useEffect(() => {
+    if (domainId && availableDomains.length > 0) {
+      const match = availableDomains.find((d) => d.id === domainId);
+      if (!match) {
+        setDomainId("");
+      }
+    }
+  }, [domainId, availableDomains]);
   const [members, setMembers] = useState<MemberFormState[]>(
     team?.members?.map((m) => ({
       id: m.id,
@@ -252,7 +295,42 @@ function TeamFormModal({
   );
   const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
   const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
-  const existingScreenshot = team?.payment?.screenshots?.[0] ?? null;
+
+  // Fetch full live team record in edit mode to guarantee member images and screenshots are loaded
+  const { data: teamDetailData } = useQuery<{ team: Team }>({
+    queryKey: ["admin-team-detail", team?.id],
+    queryFn: async () => {
+      if (!team?.id) return null as any;
+      const r = await fetch(`/api/admin/teams/${team.id}`);
+      if (!r.ok) return null as any;
+      return r.json();
+    },
+    enabled: Boolean(isEdit && team?.id),
+  });
+
+  const detailedTeam = teamDetailData?.team ?? team;
+  const existingScreenshot = detailedTeam?.payment?.screenshots?.[0] ?? null;
+  const paymentId = detailedTeam?.payment?.id;
+
+  // Sync member IDs and photo availability when live team details arrive
+  useEffect(() => {
+    if (teamDetailData?.team?.members) {
+      setMembers((prev) =>
+        prev.map((m, idx) => {
+          const fresh = teamDetailData.team.members[idx];
+          if (!fresh) return m;
+          return {
+            ...m,
+            id: m.id || fresh.id,
+            hasParticipantImage: fresh.hasParticipantImage ?? m.hasParticipantImage,
+          };
+        })
+      );
+      if (teamDetailData.team.payment?.transactionId && !transactionId) {
+        setTransactionId(teamDetailData.team.payment.transactionId);
+      }
+    }
+  }, [teamDetailData]);
 
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -307,6 +385,10 @@ function TeamFormModal({
     if (teamNameHasInvalid) issues.push("Team name has invalid characters");
     if (!college.trim() || college.trim().length < 2) issues.push("College name must be at least 2 characters");
     if (collegeHasDigits) issues.push("College name cannot contain numbers");
+    if (!degree) issues.push("Degree category is required (Diploma, UG, PG)");
+    if (availableDomains.length > 0 && !domainId) {
+      issues.push(`Please select an applicable competition domain for ${degree}`);
+    }
     if (leaderCount !== 1) issues.push("Exactly one team leader must be designated");
     if (members.length < 3 || members.length > 4) issues.push("Team must have 3 or 4 members");
 
@@ -320,7 +402,8 @@ function TeamFormModal({
       if (!m.college.trim() || m.college.trim().length < 2) issues.push(`${label}: College must be at least 2 characters`);
       if (/\d/.test(m.college)) issues.push(`${label}: Numbers not allowed in member college`);
       if (!m.degree.trim()) issues.push(`${label}: Degree is required`);
-      if (!isEdit && !m.participantImageFile) {
+      const hasPhoto = Boolean(m.participantImageFile || m.hasParticipantImage || (isEdit && m.id));
+      if (!hasPhoto) {
         issues.push(`${label}: Participant photo is required`);
       }
     });
@@ -357,6 +440,8 @@ function TeamFormModal({
         JSON.stringify({
           teamName: teamName.trim(),
           college: college.trim() || undefined,
+          degree: degree || undefined,
+          domainId: domainId || undefined,
           members: payloadMembers,
           status,
           transactionId: transactionId.trim() || undefined,
@@ -490,6 +575,72 @@ function TeamFormModal({
               </div>
             </div>
 
+            {/* Degree and Domain selection */}
+            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-white/5">
+              <div>
+                <label className="block">
+                  <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                    Degree Category <span className="text-[#D83A43]">*</span>
+                  </span>
+                  <select
+                    value={degree}
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setDegree(val);
+                      if (val) {
+                        setMembers((ms) => ms.map((m) => ({ ...m, degree: m.degree || val })));
+                      }
+                    }}
+                    className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none"
+                  >
+                    <option value="">Select Degree Category</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="UG">UG (Undergraduate)</option>
+                    <option value="PG">PG (Postgraduate)</option>
+                  </select>
+                </label>
+                {attemptedSubmit && !degree && (
+                  <p className="text-xs text-[#D83A43] mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle size={12} className="shrink-0" /> Degree category is required
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block">
+                  <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                    Competition Domain {availableDomains.length > 0 && <span className="text-[#D83A43]">*</span>}
+                  </span>
+                  <select
+                    value={domainId}
+                    onChange={(e) => setDomainId(e.target.value)}
+                    disabled={!degree || domainsLoading}
+                    className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="">
+                      {!degree
+                        ? "Select Degree First"
+                        : domainsLoading
+                        ? "Loading domains…"
+                        : availableDomains.length === 0
+                        ? "No domains registered for this degree"
+                        : "Select Domain"}
+                    </option>
+                    {availableDomains.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {attemptedSubmit && availableDomains.length > 0 && !domainId && (
+                  <p className="text-xs text-[#D83A43] mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle size={12} className="shrink-0" /> Domain selection is required
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Status selection */}
             <div>
               <label className="block">
@@ -560,7 +711,7 @@ function TeamFormModal({
 
                 const degreeError = attemptedSubmit && !m.degree.trim() ? "• Degree is required" : undefined;
 
-                const hasPhoto = Boolean(m.participantImageFile || m.hasParticipantImage);
+                const hasPhoto = Boolean(m.participantImageFile || m.hasParticipantImage || (isEdit && m.id));
                 const photoError = attemptedSubmit && !hasPhoto ? "• Participant photo is required" : undefined;
 
                 return (
@@ -717,65 +868,35 @@ function TeamFormModal({
                           <span className="text-[10px] text-[#A8A8A8]/60">JPEG / PNG / WebP · Max 5MB</span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/40 transition-colors">
-                          <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-4 py-2 text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95">
-                            <ImagePlus size={14} />
-                            <span>{m.participantImageFile || m.hasParticipantImage ? "Change Image" : "Select Image"}</span>
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (f) {
-                                  const preview = URL.createObjectURL(f);
-                                  setMember(i, { participantImageFile: f, participantImagePreview: preview });
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                          </label>
+                        <div className="space-y-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/40 transition-colors">
+                          <AdminMemberImagePreview
+                            memberId={m.id}
+                            hasSavedImage={m.hasParticipantImage}
+                            newFile={m.participantImageFile}
+                            newPreview={m.participantImagePreview}
+                            onClearNewFile={() => {
+                              setMember(i, { participantImageFile: null, participantImagePreview: null });
+                            }}
+                          />
 
-                          {/* Preview for newly selected image */}
-                          {m.participantImagePreview && m.participantImageFile && (
-                            <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg p-1.5 pr-3">
-                              <img src={m.participantImagePreview} alt="Preview" className="h-9 w-9 rounded object-cover" />
-                              <div className="min-w-0">
-                                <div className="truncate max-w-[150px] font-medium">{m.participantImageFile.name}</div>
-                                <div className="text-[10px] text-green-400 font-mono">
-                                  {Math.ceil(m.participantImageFile.size / 1024)} KB · Ready
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setMember(i, { participantImageFile: null, participantImagePreview: null })}
-                                className="text-[#D83A43] hover:text-white p-1 ml-1"
-                                title="Remove photo"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Existing image display in edit mode when no new file is picked */}
-                          {!m.participantImageFile && m.hasParticipantImage && m.id && (
-                            <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg p-1.5 pr-3">
-                              <img
-                                src={`/api/admin/participants/${m.id}/image`}
-                                alt="Current photo"
-                                className="h-9 w-9 rounded object-cover"
+                          <div>
+                            <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-4 py-2 text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95">
+                              <ImagePlus size={14} />
+                              <span>{m.participantImageFile || m.hasParticipantImage || (isEdit && m.id) ? "Change Image" : "Select Image"}</span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) {
+                                    const preview = URL.createObjectURL(f);
+                                    setMember(i, { participantImageFile: f, participantImagePreview: preview });
+                                  }
+                                }}
+                                className="sr-only"
                               />
-                              <div className="min-w-0">
-                                <div className="font-medium text-white">Current photo on file</div>
-                                <div className="text-[10px] text-green-400 flex items-center gap-1">
-                                  <Check size={10} /> Saved
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {!m.participantImageFile && !m.hasParticipantImage && (
-                            <span className="text-xs text-[#A8A8A8]">No photo selected</span>
-                          )}
+                            </label>
+                          </div>
                         </div>
 
                         {photoError && (
@@ -840,65 +961,36 @@ function TeamFormModal({
               {/* Payment Screenshot Upload */}
               <div className="sm:col-span-2 space-y-2">
                 <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8] block">Payment Screenshot</span>
-                <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/40 transition-colors">
-                  <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 text-white px-4 py-2 text-xs font-semibold tracking-wide transition-all">
-                    <Upload size={14} />
-                    <span>{paymentScreenshotFile || existingScreenshot ? "Replace Screenshot" : "Upload Screenshot"}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          setPaymentScreenshotFile(f);
-                          setPaymentScreenshotPreview(URL.createObjectURL(f));
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                  </label>
+                <div className="space-y-3 p-3 rounded-lg border border-white/10 bg-[#080808]/80 hover:border-[#B52A32]/40 transition-colors">
+                  <AdminPaymentScreenshotPreview
+                    paymentId={paymentId}
+                    existingScreenshot={existingScreenshot}
+                    newFile={paymentScreenshotFile}
+                    newPreview={paymentScreenshotPreview}
+                    onClearNewFile={() => {
+                      setPaymentScreenshotFile(null);
+                      setPaymentScreenshotPreview(null);
+                    }}
+                  />
 
-                  {paymentScreenshotPreview && paymentScreenshotFile && (
-                    <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg p-1.5 pr-3">
-                      <img src={paymentScreenshotPreview} alt="Screenshot preview" className="h-9 w-9 rounded object-cover" />
-                      <div className="min-w-0">
-                        <div className="truncate max-w-[150px] font-medium">{paymentScreenshotFile.name}</div>
-                        <div className="text-[10px] text-green-400 font-mono">
-                          {Math.ceil(paymentScreenshotFile.size / 1024)} KB · Ready
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentScreenshotFile(null);
-                          setPaymentScreenshotPreview(null);
+                  <div>
+                    <label className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 text-white px-4 py-2 text-xs font-semibold tracking-wide transition-all shadow-md active:scale-95">
+                      <Upload size={14} />
+                      <span>{paymentScreenshotFile || existingScreenshot || paymentId ? "Replace Screenshot" : "Upload Screenshot"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setPaymentScreenshotFile(f);
+                            setPaymentScreenshotPreview(URL.createObjectURL(f));
+                          }
                         }}
-                        className="text-[#D83A43] hover:text-white p-1 ml-1"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-
-                  {!paymentScreenshotFile && existingScreenshot && team?.payment && (
-                    <div className="flex items-center gap-2 text-xs text-white bg-white/5 border border-white/10 rounded-lg p-1.5 pr-3">
-                      <img
-                        src={`/api/admin/payments/${team.payment.id}/screenshot?screenshotId=${existingScreenshot.id}`}
-                        alt="Existing screenshot"
-                        className="h-9 w-9 rounded object-cover"
+                        className="sr-only"
                       />
-                      <div className="min-w-0">
-                        <div className="truncate max-w-[180px] font-medium">{existingScreenshot.fileName}</div>
-                        <div className="text-[10px] text-[#A8A8A8] font-mono">
-                          {Math.ceil(existingScreenshot.sizeBytes / 1024)} KB · Stored
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!paymentScreenshotFile && !existingScreenshot && (
-                    <span className="text-xs text-[#A8A8A8]">No screenshot attached</span>
-                  )}
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -979,4 +1071,311 @@ function AdminDegreeField({
       )}
     </div>
   );
+}
+
+// ─── Admin Member Photo Preview & Fetcher ───────────────────────────────────
+
+function AdminMemberImagePreview({
+  memberId,
+  hasSavedImage,
+  newFile,
+  newPreview,
+  onClearNewFile,
+}: {
+  memberId?: string;
+  hasSavedImage?: boolean;
+  newFile?: File | null;
+  newPreview?: string | null;
+  onClearNewFile?: () => void;
+}) {
+  const [fetchedUrl, setFetchedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [fetchFailed, setFetchFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!memberId || newFile) {
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setLoading(true);
+    setFetchFailed(false);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/participants/${memberId}/image`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          throw new Error("No image found");
+        }
+        const blob = await res.blob();
+        if (blob.size === 0) throw new Error("Empty image payload");
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setFetchedUrl(objectUrl);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setFetchFailed(true);
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [memberId, newFile]);
+
+  // If a new replacement file is chosen by the admin
+  if (newFile && newPreview) {
+    return (
+      <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-2.5 max-w-md">
+        <img
+          src={newPreview}
+          alt="New photo preview"
+          className="h-16 w-16 rounded-lg object-cover border border-white/20 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-white truncate">{newFile.name}</div>
+          <div className="text-[10px] text-green-400 font-mono mt-0.5 flex items-center gap-1">
+            <Check size={10} /> {Math.ceil(newFile.size / 1024)} KB · Ready to save
+          </div>
+          {onClearNewFile && (
+            <button
+              type="button"
+              onClick={onClearNewFile}
+              className="mt-1.5 text-[11px] text-[#D83A43] hover:text-red-300 transition-colors flex items-center gap-1 font-medium"
+            >
+              <RotateCcw size={10} /> Revert to saved photo
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // If actively fetching existing saved photo from server
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-xs text-[#A8A8A8]">
+        <Loader2 size={14} className="animate-spin text-[#B52A32] shrink-0" />
+        <span>Fetching photo from secure server…</span>
+      </div>
+    );
+  }
+
+  // If image was successfully fetched
+  if (fetchedUrl) {
+    return (
+      <div className="flex items-center gap-3 bg-[#080808] border border-white/15 rounded-xl p-2.5 max-w-md">
+        <a
+          href={fetchedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Click to view full photo in new tab"
+          className="group relative h-16 w-16 rounded-lg overflow-hidden border border-white/20 shrink-0 hover:border-[#B52A32] transition-colors"
+        >
+          <img
+            src={fetchedUrl}
+            alt="Participant photo"
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+            <ExternalLink size={12} />
+          </div>
+        </a>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+            <span>Saved Photo on File</span>
+          </div>
+          <div className="text-[10px] text-[#A8A8A8] mt-0.5">Fetched from storage</div>
+          <a
+            href={fetchedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#B52A32] hover:text-[#D83A43] font-medium transition-colors"
+          >
+            <ExternalLink size={10} /> View full photo ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // If in edit mode with participant ID but no photo exists
+  if (memberId && fetchFailed) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-950/20 border border-amber-600/30 text-xs text-amber-300">
+        <AlertTriangle size={13} className="shrink-0" />
+        <span>No photo on file for this participant</span>
+      </div>
+    );
+  }
+
+  return <span className="text-xs text-[#A8A8A8]">No photo selected</span>;
+}
+
+// ─── Admin Payment Screenshot Preview & Fetcher ──────────────────────────────
+
+function AdminPaymentScreenshotPreview({
+  paymentId,
+  existingScreenshot,
+  newFile,
+  newPreview,
+  onClearNewFile,
+}: {
+  paymentId?: string;
+  existingScreenshot?: { id: string; fileName: string; sizeBytes: number } | null;
+  newFile?: File | null;
+  newPreview?: string | null;
+  onClearNewFile?: () => void;
+}) {
+  const [fetchedUrl, setFetchedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [fetchFailed, setFetchFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!paymentId || newFile) {
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setLoading(true);
+    setFetchFailed(false);
+
+    (async () => {
+      try {
+        const query = existingScreenshot?.id ? `?screenshotId=${encodeURIComponent(existingScreenshot.id)}` : "";
+        const res = await fetch(`/api/admin/payments/${paymentId}/screenshot${query}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          throw new Error("No screenshot found");
+        }
+        const blob = await res.blob();
+        if (blob.size === 0) throw new Error("Empty screenshot payload");
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setFetchedUrl(objectUrl);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setFetchFailed(true);
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [paymentId, existingScreenshot?.id, newFile]);
+
+  // If replacement screenshot selected
+  if (newFile && newPreview) {
+    return (
+      <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-2.5 max-w-md">
+        <img
+          src={newPreview}
+          alt="New screenshot preview"
+          className="h-20 w-20 rounded-lg object-cover border border-white/20 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-white truncate">{newFile.name}</div>
+          <div className="text-[10px] text-green-400 font-mono mt-0.5 flex items-center gap-1">
+            <Check size={10} /> {Math.ceil(newFile.size / 1024)} KB · Ready to save
+          </div>
+          {onClearNewFile && (
+            <button
+              type="button"
+              onClick={onClearNewFile}
+              className="mt-1.5 text-[11px] text-[#D83A43] hover:text-red-300 transition-colors flex items-center gap-1 font-medium"
+            >
+              <RotateCcw size={10} /> Revert to original screenshot
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-xs text-[#A8A8A8]">
+        <Loader2 size={14} className="animate-spin text-[#B52A32] shrink-0" />
+        <span>Fetching payment screenshot from secure server…</span>
+      </div>
+    );
+  }
+
+  // Screenshot fetched successfully
+  if (fetchedUrl) {
+    return (
+      <div className="flex items-center gap-3 bg-[#080808] border border-white/15 rounded-xl p-2.5 max-w-md">
+        <a
+          href={fetchedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Click to view full screenshot in new tab"
+          className="group relative h-20 w-20 rounded-lg overflow-hidden border border-white/20 shrink-0 hover:border-[#B52A32] transition-colors"
+        >
+          <img
+            src={fetchedUrl}
+            alt="Payment screenshot"
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+            <ExternalLink size={14} />
+          </div>
+        </a>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+            <span>Screenshot on File</span>
+          </div>
+          {existingScreenshot?.fileName && (
+            <div className="text-[11px] text-white/80 font-mono truncate max-w-[200px] mt-0.5">
+              {existingScreenshot.fileName}
+            </div>
+          )}
+          {existingScreenshot?.sizeBytes && (
+            <div className="text-[10px] text-[#A8A8A8] font-mono">
+              {Math.ceil(existingScreenshot.sizeBytes / 1024)} KB · Verified
+            </div>
+          )}
+          <a
+            href={fetchedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#B52A32] hover:text-[#D83A43] font-medium transition-colors"
+          >
+            <ExternalLink size={10} /> View full screenshot ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (paymentId && fetchFailed) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-950/20 border border-amber-600/30 text-xs text-amber-300">
+        <AlertTriangle size={13} className="shrink-0" />
+        <span>No screenshot found on file</span>
+      </div>
+    );
+  }
+
+  return <span className="text-xs text-[#A8A8A8]">No screenshot attached</span>;
 }

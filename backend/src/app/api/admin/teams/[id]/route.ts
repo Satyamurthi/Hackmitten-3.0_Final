@@ -26,6 +26,25 @@ function sanitizeAdminTeam(team: any) {
 }
 
 /**
+ * GET /api/admin/teams/:id
+ * Fetches single team details for admin editing and viewing.
+ */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requirePermission("registration:view");
+    const { id } = await params;
+    const team = await db.team.findUnique({
+      where: { id },
+      select: ADMIN_TEAM_SELECT,
+    });
+    if (!team) return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    return NextResponse.json({ team: sanitizeAdminTeam(team) });
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+/**
  * PATCH /api/admin/teams/:id
  * Edit a team (name, college, member info, status, payment). SUPER_ADMIN only.
  * Supports JSON or multipart/form-data.
@@ -75,8 +94,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
     if (!team) return NextResponse.json({ error: "Team not found" }, { status: 404 });
 
-    // Update team name + college + status
-    const updateData: { teamName?: string; college?: string | null; status?: "SUBMITTED" | "APPROVED" } = {};
+    // Update team name + college + status + degree + domain
+    const updateData: {
+      teamName?: string;
+      college?: string | null;
+      status?: "SUBMITTED" | "APPROVED";
+      degree?: string | null;
+      domainId?: string | null;
+      domainName?: string | null;
+    } = {};
     if (body.teamName && body.teamName.trim() !== team.teamName) {
       const norm = normalizeTeamName(body.teamName);
       const matches = await db.$queryRaw<Array<{ id: string }>>`
@@ -92,6 +118,46 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       updateData.teamName = body.teamName.trim();
     }
     if (body.college !== undefined) updateData.college = body.college.trim() || null;
+
+    if (body.degree !== undefined) {
+      const deg = body.degree ? String(body.degree).trim() : null;
+      if (deg && !["Diploma", "UG", "PG"].includes(deg)) {
+        return NextResponse.json({ error: "Invalid degree category. Must be Diploma, UG, or PG." }, { status: 400 });
+      }
+      updateData.degree = deg;
+    }
+
+    if (body.domainId !== undefined) {
+      const dId = body.domainId ? String(body.domainId).trim() : null;
+      if (dId) {
+        const dom = await db.domain.findUnique({ where: { id: dId } });
+        if (!dom) {
+          return NextResponse.json({ error: "Domain not found" }, { status: 400 });
+        }
+        const effectiveDegree = updateData.degree !== undefined ? updateData.degree : team.degree;
+        if (effectiveDegree && !dom.degrees.includes(effectiveDegree)) {
+          return NextResponse.json(
+            { error: `Domain '${dom.name}' is not compatible with degree '${effectiveDegree}'.` },
+            { status: 400 },
+          );
+        }
+        updateData.domainId = dom.id;
+        updateData.domainName = dom.name;
+      } else {
+        updateData.domainId = null;
+        updateData.domainName = null;
+      }
+    } else if (updateData.degree !== undefined && updateData.degree !== team.degree) {
+      if (team.domainId && updateData.degree) {
+        const curDom = await db.domain.findUnique({ where: { id: team.domainId } });
+        if (curDom && !curDom.degrees.includes(updateData.degree)) {
+          return NextResponse.json(
+            { error: `Current domain '${curDom.name}' is not compatible with '${updateData.degree}'. Please select a valid domain.` },
+            { status: 400 },
+          );
+        }
+      }
+    }
 
     const teamNameChanged = Boolean(updateData.teamName && updateData.teamName !== team.teamName);
     const collegeChanged = Boolean(updateData.college !== undefined && updateData.college !== team.college);
@@ -118,6 +184,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             phone: z.string().trim().regex(/^[6-9][0-9]{9}$/, "Phone must be a valid 10-digit Indian mobile number"),
             college: z.string().min(2, "College name must be at least 2 characters").max(150).regex(/^[^\d]*$/, "College name cannot contain numbers"),
             degree: z.string().trim().min(1, "Degree is required").max(60),
+            isLeader: z.boolean().optional(),
           })
         )
         .min(3, "Minimum 3 members required")
@@ -265,7 +332,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             phone: m.phone.trim(),
             college: m.college.trim(),
             degree: m.degree ? m.degree.trim() : null,
-            isLeader: i === 0,
+            isLeader: typeof m.isLeader === "boolean" ? m.isLeader : i === 0,
           };
 
           if (newImg) {

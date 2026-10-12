@@ -8,6 +8,10 @@ export const ADMIN_TEAM_SELECT = {
   registrationId: true,
   status: true,
   college: true,
+  degree: true,
+  domainId: true,
+  domainName: true,
+  domain: { select: { id: true, name: true, degrees: true } },
   createdAt: true,
   members: {
     select: {

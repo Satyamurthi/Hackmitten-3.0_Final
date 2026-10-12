@@ -117,6 +117,22 @@ export async function POST(req: Request) {
       );
     }
 
+    const degree = parsed.data.degree ?? null;
+    const domainId = parsed.data.domainId ?? null;
+    let domainRecord: { id: string; name: string; degrees: string[] } | null = null;
+    if (domainId) {
+      domainRecord = await db.domain.findUnique({ where: { id: domainId } });
+      if (!domainRecord || !domainRecord.enabled) {
+        return NextResponse.json({ error: "Selected domain is not available." }, { status: 400 });
+      }
+      if (degree && !domainRecord.degrees.includes(degree)) {
+        return NextResponse.json(
+          { error: `Domain '${domainRecord.name}' is not applicable for ${degree} degree.` },
+          { status: 400 },
+        );
+      }
+    }
+
     const participantImages: Array<Awaited<ReturnType<typeof storeParticipantImage>>> = [];
     for (let index = 0; index < members.length; index++) {
       const file = files[index];
@@ -164,6 +180,9 @@ export async function POST(req: Request) {
         data: {
           teamName,
           college: college ?? members[0]?.college ?? null,
+          degree: degree ?? null,
+          domainId: domainRecord?.id ?? null,
+          domainName: domainRecord?.name ?? null,
           status: "SUBMITTED",
           registrationAccessTokenHash: hashRegistrationAccessToken(registrationAccessToken),
           registrationAccessExpiresAt: new Date(Date.now() + REGISTRATION_ACCESS_COOKIE_MAX_AGE_SECONDS * 1000),

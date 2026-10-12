@@ -1,23 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission, jsonError } from "@/lib/api-auth";
-import { readPrivateFile } from "@/lib/upload";
+import { readPrivateFile, readPublicUpload } from "@/lib/upload";
 
-/**
- * GET /api/admin/payments/:id/screenshot
- *
- * Streams a private payment screenshot to authorized admin/coordinator users.
- * Payment screenshots are NEVER publicly accessible — no raw URL is ever returned.
- *
- * Authorization: requires "registration:view" permission (SUPER_ADMIN or COORDINATOR).
- * Returns: image bytes with proper Content-Type and Cache-Control: no-store.
- *
- * Security:
- *   - Unauthenticated → 401
- *   - Wrong role → 403
- *   - No screenshot → 404
- *   - Never returns a raw private storage URL or local file path
- */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requirePermission("registration:view");
@@ -27,12 +12,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const screenshot = await db.paymentScreenshot.findFirst({
       where: { paymentId: id, ...(screenshotId ? { id: screenshotId } : {}) },
       orderBy: { createdAt: "desc" },
-      select: { filePath: true },
+      select: { filePath: true, mimeType: true },
     });
     if (!screenshot) return NextResponse.json({ error: "No screenshot" }, { status: 404 });
     const filePath = screenshot.filePath;
 
-    // Private files are read only from the configured persistent storage root.
+    // Private files
     if (filePath.startsWith("private://")) {
       const result = await readPrivateFile(filePath);
       if (!result) {
@@ -40,17 +25,37 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }
       return new Response(new Uint8Array(result.data), {
         headers: {
-          "Content-Type": result.contentType,
+          "Content-Type": result.contentType || screenshot.mimeType || "image/jpeg",
           "X-Content-Type-Options": "nosniff",
-          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Cache-Control": "private, max-age=60",
         },
       });
     }
 
-    // Path C: Legacy/old public upload — do NOT serve directly, return 404 for safety
-    // Old screenshots uploaded before the privacy fix may have public paths.
-    // They should be re-uploaded. Never expose the raw URL.
-    return NextResponse.json({ error: "Screenshot format unsupported — re-upload required" }, { status: 404 });
+    // Public / legacy uploads
+    if (filePath.startsWith("/api/uploads/")) {
+      const match = filePath.match(/^\/api\/uploads\/([a-z0-9_-]{1,40}_[a-f0-9]{12}\.(?:jpg|png|webp|gif))$/);
+      if (match) {
+        const contents = await readPublicUpload(match[1]);
+        if (contents) {
+          const ext = match[1].slice(match[1].lastIndexOf(".") + 1).toLowerCase();
+          const contentType =
+            ext === "png" ? "image/png" :
+            ext === "webp" ? "image/webp" :
+            ext === "gif" ? "image/gif" :
+            "image/jpeg";
+          return new Response(new Uint8Array(contents), {
+            headers: {
+              "Content-Type": contentType,
+              "X-Content-Type-Options": "nosniff",
+              "Cache-Control": "private, max-age=60",
+            },
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ error: "Screenshot not found" }, { status: 404 });
   } catch (err) {
     return jsonError(err);
   }

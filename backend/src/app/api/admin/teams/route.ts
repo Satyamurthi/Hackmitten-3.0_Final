@@ -123,6 +123,26 @@ export async function POST(req: Request) {
       );
     }
 
+    const degree = bodyData.degree ? String(bodyData.degree).trim() : null;
+    if (degree && !["Diploma", "UG", "PG"].includes(degree)) {
+      return NextResponse.json({ error: "Invalid degree category. Must be Diploma, UG, or PG." }, { status: 400 });
+    }
+
+    const domainId = bodyData.domainId ? String(bodyData.domainId).trim() : null;
+    let domainRecord: { id: string; name: string; degrees: string[] } | null = null;
+    if (domainId) {
+      domainRecord = await db.domain.findUnique({ where: { id: domainId } });
+      if (!domainRecord) {
+        return NextResponse.json({ error: "Selected domain not found" }, { status: 400 });
+      }
+      if (degree && !domainRecord.degrees.includes(degree)) {
+        return NextResponse.json(
+          { error: `Domain '${domainRecord.name}' is not applicable for ${degree} degree.` },
+          { status: 400 },
+        );
+      }
+    }
+
     // Process participant images if provided
     const storedMemberImages: Array<{ relativePath: string; mimeType: string } | null> = [];
     for (let i = 0; i < members.length; i++) {
@@ -142,6 +162,9 @@ export async function POST(req: Request) {
         data: {
           teamName,
           college: college ?? members[0]?.college ?? null,
+          degree: degree ?? null,
+          domainId: domainRecord?.id ?? null,
+          domainName: domainRecord?.name ?? null,
           status: wantApproved ? "APPROVED" : "SUBMITTED",
         },
       });

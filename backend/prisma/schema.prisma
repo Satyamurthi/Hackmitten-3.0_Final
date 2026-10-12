@@ -98,6 +98,10 @@ model Team {
   registrationAccessExpiresAt             DateTime?
   status                                  RegistrationStatus @default(DRAFT)
   college                                 String?
+  degree                                  String?
+  domainId                                String?
+  domain                                  Domain?            @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  domainName                              String?
   registrationAcknowledgementAttemptedAt  DateTime?
   registrationAcknowledgementAttemptCount Int                @default(0)
   registrationAcknowledgementSentAt       DateTime?
@@ -111,7 +115,38 @@ model Team {
 
   @@index([status])
   @@index([college])
+  @@index([degree])
+  @@index([domainId])
   @@index([registrationId])
+}
+
+model Domain {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  degrees   String[]
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams     Team[]
+
+  @@index([enabled])
+  @@index([name])
+}
+
+model PaymentQrCode {
+  id        String   @id @default(cuid())
+  label     String?
+  degrees   String[]
+  filePath  String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  upiId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
 }
 
 model Participant {

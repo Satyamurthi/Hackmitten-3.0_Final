@@ -11,10 +11,15 @@ export interface MemberForm {
   participantImage: File | null;
 }
 
+export type DegreeCategory = "Diploma" | "UG" | "PG";
+
 interface RegisterState {
   step: number; // 0..4
   teamName: string;
   college: string;
+  degree: DegreeCategory | "";
+  domainId: string;
+  domainName: string;
   members: MemberForm[];
   transactionId: string;
   screenshot: File | null;
@@ -33,6 +38,8 @@ interface RegisterState {
   prev: () => void;
   setTeamName: (s: string) => void;
   setCollege: (s: string) => void;
+  setDegree: (d: DegreeCategory | "") => void;
+  setDomain: (id: string, name: string) => void;
   setMember: (idx: number, m: Partial<MemberForm>) => void;
   addMember: () => void;
   removeMember: (idx: number) => void;
@@ -45,12 +52,22 @@ interface RegisterState {
   reset: () => void;
 }
 
-const emptyMember = (): MemberForm => ({ fullName: "", email: "", phone: "", college: "", degree: "", participantImage: null });
+const emptyMember = (): MemberForm => ({
+  fullName: "",
+  email: "",
+  phone: "",
+  college: "",
+  degree: "",
+  participantImage: null,
+});
 
 export const useRegisterStore = create<RegisterState>((set) => ({
   step: 0,
   teamName: "",
   college: "",
+  degree: "",
+  domainId: "",
+  domainName: "",
   members: [emptyMember(), emptyMember(), emptyMember()],
   transactionId: "",
   screenshot: null,
@@ -65,13 +82,35 @@ export const useRegisterStore = create<RegisterState>((set) => ({
   prev: () => set((st) => ({ step: Math.max(0, st.step - 1) })),
   setTeamName: (s) => set({ teamName: s }),
   setCollege: (s) => set({ college: s }),
+  setDegree: (d) =>
+    set((st) => {
+      const resetDomain = st.degree !== d;
+      return {
+        degree: d,
+        domainId: resetDomain ? "" : st.domainId,
+        domainName: resetDomain ? "" : st.domainName,
+        // Also prefill members if they don't have degree yet
+        members: st.members.map((m) => ({
+          ...m,
+          degree: m.degree ? m.degree : d,
+        })),
+      };
+    }),
+  setDomain: (id, name) => set({ domainId: id, domainName: name }),
   setMember: (idx, m) =>
     set((st) => ({
       members: st.members.map((mem, i) => (i === idx ? { ...mem, ...m } : mem)),
     })),
   addMember: () =>
     set((st) =>
-      st.members.length < 4 ? { members: [...st.members, emptyMember()] } : st,
+      st.members.length < 4
+        ? {
+            members: [
+              ...st.members,
+              { ...emptyMember(), degree: st.degree || "" },
+            ],
+          }
+        : st,
     ),
   removeMember: (idx) =>
     set((st) => ({
@@ -101,6 +140,9 @@ export const useRegisterStore = create<RegisterState>((set) => ({
         step: 0,
         teamName: "",
         college: "",
+        degree: "",
+        domainId: "",
+        domainName: "",
         members: [emptyMember(), emptyMember(), emptyMember()],
         transactionId: "",
         screenshot: null,

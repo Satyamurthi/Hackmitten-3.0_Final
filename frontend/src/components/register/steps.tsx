@@ -51,7 +51,16 @@ export function RegisterStepper() {
 // ─── STEP 0: TEAM ─────────────────────────────────────────────────────────────
 
 export function StepTeam() {
-  const { teamName, setTeamName, next } = useRegisterStore();
+  const {
+    teamName,
+    setTeamName,
+    degree,
+    setDegree,
+    domainId,
+    domainName,
+    setDomain,
+    next,
+  } = useRegisterStore();
   const normalizedTeamName = normalizeTeamName(teamName);
   const validFormat = normalizedTeamName.length >= 2 && /^[a-zA-Z0-9 _\-.]+$/.test(teamName.trim());
   const [debouncedTeamName, setDebouncedTeamName] = useState(normalizedTeamName);
@@ -72,6 +81,30 @@ export function StepTeam() {
     staleTime: 30_000,
   });
 
+  // Degree-based domain filtering
+  const { data: domainsData, isLoading: domainsLoading } = useQuery<{ domains: Array<{ id: string; name: string; degrees: string[] }> }>({
+    queryKey: ["domains-for-degree", degree],
+    queryFn: async () => {
+      if (!degree) return { domains: [] };
+      const r = await fetch(`/api/domains?degree=${encodeURIComponent(degree)}`);
+      if (!r.ok) return { domains: [] };
+      return r.json();
+    },
+    enabled: Boolean(degree),
+  });
+
+  const availableDomains = domainsData?.domains || [];
+
+  // Reset selected domain if no longer valid for selected degree
+  useEffect(() => {
+    if (domainId && availableDomains.length > 0) {
+      const match = availableDomains.find((d) => d.id === domainId);
+      if (!match) {
+        setDomain("", "");
+      }
+    }
+  }, [domainId, availableDomains, setDomain]);
+
   const checking = validFormat && (debouncedTeamName !== normalizedTeamName || isFetching);
   const availability = !validFormat
     ? "invalid"
@@ -84,51 +117,146 @@ export function StepTeam() {
           : checkData?.available === true
             ? "available"
             : "error";
-  const valid = availability === "available";
+
+  const hasDomains = availableDomains.length > 0;
+  const domainSelected = !hasDomains || Boolean(domainId);
+  const degreeSelected = Boolean(degree);
+  const valid = availability === "available" && degreeSelected && domainSelected;
 
   return (
-    <div className="max-w-xl mx-auto">
-      <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">NAME YOUR CREW.</h2>
-      <p className="text-sm md:text-base text-[#A8A8A8] mb-8 md:mb-10">
-        Pick a team name. This is how you will be known throughout the mission.
-      </p>
+    <div className="max-w-xl mx-auto space-y-8">
+      <div>
+        <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">NAME YOUR CREW.</h2>
+        <p className="text-sm md:text-base text-[#A8A8A8]">
+          Pick your team name, select your degree, and choose your competition domain.
+        </p>
+      </div>
 
-      <label className="block">
-        <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-          Team Name
-        </span>
-        <input
-          type="text"
-          value={teamName}
-          onChange={(e) => setTeamName(e.target.value)}
-          placeholder="Enter your team name"
-          maxLength={60}
-          className="mt-2 w-full bg-transparent border-b border-white/15 py-3 text-xl md:text-2xl text-white placeholder:text-[#A8A8A8]/40 focus:border-[#B52A32] focus:outline-none transition-colors"
-        />
-      </label>
-      {teamName.length > 0 && (
-        <div className="mt-2 text-xs">
-          {checking ? (
-            <span className="text-[#A8A8A8]">Checking availability…</span>
-          ) : availability === "taken" ? (
-            <span className="text-[#D83A43] flex items-center gap-1.5">
-              <AlertCircle size={12} /> Team name already exists. Please choose a different team name.
+      {/* Team Name */}
+      <div>
+        <label className="block">
+          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+            Team Name *
+          </span>
+          <input
+            type="text"
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            placeholder="Enter your team name"
+            maxLength={60}
+            className="mt-2 w-full bg-transparent border-b border-white/15 py-3 text-xl md:text-2xl text-white placeholder:text-[#A8A8A8]/40 focus:border-[#B52A32] focus:outline-none transition-colors"
+          />
+        </label>
+        {teamName.length > 0 && (
+          <div className="mt-2 text-xs">
+            {checking ? (
+              <span className="text-[#A8A8A8]">Checking availability…</span>
+            ) : availability === "taken" ? (
+              <span className="text-[#D83A43] flex items-center gap-1.5">
+                <AlertCircle size={12} /> Team name already exists. Please choose a different team name.
+              </span>
+            ) : availability === "available" ? (
+              <span className="text-green-400 flex items-center gap-1.5">
+                <Check size={12} /> Team name is available.
+              </span>
+            ) : availability === "error" ? (
+              <span className="text-[#D83A43] flex items-center gap-1.5">
+                <AlertCircle size={12} /> Unable to verify team name. Please try again.
+              </span>
+            ) : (
+              <span className="text-[#D83A43]">Team name contains invalid characters.</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Degree Category Selection */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+            Degree Category *
+          </span>
+          <span className="text-xs text-[#A8A8A8]/60">Select Diploma, UG, or PG</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {(["Diploma", "UG", "PG"] as const).map((deg) => {
+            const isSelected = degree === deg;
+            return (
+              <button
+                type="button"
+                key={deg}
+                onClick={() => setDegree(deg)}
+                className={`py-3.5 px-4 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 min-h-[58px] ${
+                  isSelected
+                    ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-lg shadow-[#B52A32]/10"
+                    : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span className="font-bold text-sm tracking-wide">{deg}</span>
+                {isSelected && (
+                  <span className="mono text-[9px] text-[#D83A43] uppercase tracking-widest flex items-center gap-1">
+                    <Check size={10} /> Selected
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Domain Selection */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+            Competition Domain {hasDomains && "*"}
+          </span>
+          {degree && (
+            <span className="text-xs text-[#B52A32] font-mono">
+              Filtered for {degree}
             </span>
-          ) : availability === "available" ? (
-            <span className="text-green-400 flex items-center gap-1.5">
-              <Check size={12} /> Team name is available.
-            </span>
-          ) : availability === "error" ? (
-            <span className="text-[#D83A43] flex items-center gap-1.5">
-              <AlertCircle size={12} /> Unable to verify team name. Please try again.
-            </span>
-          ) : (
-            <span className="text-[#D83A43]">Team name contains invalid characters.</span>
           )}
         </div>
-      )}
 
-      <div className="mt-8 md:mt-10 flex items-center justify-between">
+        {!degree ? (
+          <div className="p-4 rounded-lg border border-dashed border-white/10 bg-[#080808]/50 text-center text-xs text-[#A8A8A8]">
+            Select your Degree above to view compatible domains.
+          </div>
+        ) : domainsLoading ? (
+          <div className="p-4 rounded-lg border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
+            Loading available domains for {degree}…
+          </div>
+        ) : availableDomains.length === 0 ? (
+          <div className="p-4 rounded-lg border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
+            No domains currently registered for {degree}. (General participation)
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {availableDomains.map((dom) => {
+              const isSelected = domainId === dom.id;
+              return (
+                <button
+                  type="button"
+                  key={dom.id}
+                  onClick={() => setDomain(dom.id, dom.name)}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-md shadow-[#B52A32]/10"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/25 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm text-white truncate">{dom.name}</div>
+                    <div className="text-[10px] text-[#A8A8A8] mt-0.5 mono">Eligible: {degree}</div>
+                  </div>
+                  {isSelected && <Check size={16} className="text-[#D83A43] shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-2 flex items-center justify-between">
         <Link
           href="/"
           className="flex items-center gap-2 text-sm text-[#A8A8A8] hover:text-white transition-colors min-h-[44px]"
@@ -413,7 +541,7 @@ export function StepMembers() {
 // ─── STEP 2: DETAILS REVIEW ───────────────────────────────────────────────────
 
 export function StepDetails() {
-  const { teamName, members, next, prev } = useRegisterStore();
+  const { teamName, degree, domainName, members, next, prev } = useRegisterStore();
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -423,9 +551,23 @@ export function StepDetails() {
       </p>
 
       <div className="glass rounded-lg p-5 md:p-8">
-        <div className="pb-4 md:pb-6 border-b border-white/5">
-          <div className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">Team</div>
-          <div className="display text-xl md:text-2xl text-white mt-1 truncate">{teamName}</div>
+        <div className="pb-4 md:pb-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">Team</div>
+            <div className="display text-xl md:text-2xl text-white mt-1 truncate">{teamName}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {degree && (
+              <span className="mono text-xs px-2.5 py-1 rounded bg-[#B52A32]/20 border border-[#B52A32]/40 text-white font-semibold">
+                Degree: {degree}
+              </span>
+            )}
+            {domainName && (
+              <span className="mono text-xs px-2.5 py-1 rounded bg-white/10 border border-white/10 text-white font-semibold">
+                Domain: {domainName}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 md:mt-6 space-y-3 md:space-y-4">
@@ -483,12 +625,31 @@ export function StepPayment() {
     screenshot, screenshotPreview, setScreenshot,
     next, prev, serverError, submitting,
     teamId, setTeamId, setAcknowledgementEmailSent,
-    teamName, college, members,
+    teamName, college, degree, domainId, members,
     setServerError, setSubmitting,
   } = useRegisterStore();
 
   const fee = REGISTRATION_FEE;
-  const qrUrl = PAYMENT_QR;
+
+  // Query degree-specific payment QR info
+  const { data: qrInfo, isLoading: qrLoading } = useQuery<{
+    configured: boolean;
+    qrUrl: string | null;
+    upiId: string;
+    label?: string;
+    message?: string;
+  }>({
+    queryKey: ["payment-qr-info", degree],
+    queryFn: async () => {
+      const res = await fetch(`/api/payment-qr/info?degree=${encodeURIComponent(degree || "")}`);
+      if (!res.ok) throw new Error("Failed to load payment QR info");
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const effectiveUpiId = qrInfo?.upiId || OFFICIAL_UPI_ID;
+  const effectiveQrUrl = qrInfo?.qrUrl || (degree ? `/api/payment-qr?degree=${encodeURIComponent(degree)}` : PAYMENT_QR);
 
   const validTxn = transactionId.trim().length >= 4 && transactionId.trim().length <= 100;
   const screenshotValid = screenshot ? (
@@ -511,7 +672,16 @@ export function StepPayment() {
       let activeTeamId = teamId;
       if (!activeTeamId) {
         const registrationForm = new FormData();
-        registrationForm.append("registration", JSON.stringify({ teamName, college: members[0]?.college || "", members: members.map(({ participantImage: _image, ...member }) => member) }));
+        registrationForm.append(
+          "registration",
+          JSON.stringify({
+            teamName,
+            college: members[0]?.college || "",
+            degree: degree || undefined,
+            domainId: domainId || undefined,
+            members: members.map(({ participantImage: _image, ...member }) => member),
+          }),
+        );
         for (let index = 0; index < members.length; index++) {
           const member = members[index];
           if (member.participantImage) {
@@ -587,36 +757,62 @@ export function StepPayment() {
               Registration Fee
             </div>
             <div className="display text-4xl md:text-5xl text-white font-bold">{fee}</div>
+            {degree && (
+              <div className="mono text-[10px] text-[#D83A43] uppercase tracking-wider mt-1 font-semibold">
+                Category: {degree}
+              </div>
+            )}
             <div className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8] mt-4 md:mt-6 mb-2">
               UPI ID
             </div>
             <div className="font-mono text-sm md:text-base text-[#B52A32] select-all break-all">
-              {OFFICIAL_UPI_ID}
+              {effectiveUpiId}
             </div>
             <button
               onClick={() => {
-                navigator.clipboard?.writeText(OFFICIAL_UPI_ID);
+                navigator.clipboard?.writeText(effectiveUpiId);
               }}
               className="mt-2 text-xs text-[#A8A8A8] hover:text-white transition-colors min-h-[36px]"
             >
               Tap to copy
             </button>
           </div>
-          <div className="flex items-center justify-center">
-            <div className="aspect-square w-44 max-w-full bg-white p-2 rounded">
-              <img
-                src={qrUrl}
-                alt="Payment QR code"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.dataset.retried) {
-                    target.dataset.retried = "true";
-                    target.src = `${qrUrl}?t=${Date.now()}`;
-                  }
-                }}
-                className="block h-full w-full object-contain"
-              />
-            </div>
+          <div className="flex flex-col items-center justify-center">
+            {qrLoading ? (
+              <div className="aspect-square w-44 max-w-full bg-[#151515] border border-white/10 rounded flex items-center justify-center text-xs text-[#A8A8A8]">
+                Loading QR code…
+              </div>
+            ) : qrInfo && !qrInfo.configured ? (
+              <div className="aspect-square w-44 max-w-full bg-[#151515] border border-amber-500/30 p-3 rounded flex flex-col items-center justify-center text-center">
+                <AlertCircle size={24} className="text-amber-400 mb-2" />
+                <span className="text-[11px] text-amber-200">
+                  {qrInfo.message || `No QR configured for ${degree || "selected degree"}.`}
+                </span>
+                <span className="mono text-[9px] text-[#A8A8A8] mt-2">Use UPI ID on left</span>
+              </div>
+            ) : (
+              <div className="space-y-1.5 text-center">
+                <div className="aspect-square w-44 max-w-full bg-white p-2 rounded shadow-lg">
+                  <img
+                    src={effectiveQrUrl}
+                    alt={qrInfo?.label || `${degree || ""} Payment QR code`}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.dataset.retried) {
+                        target.dataset.retried = "true";
+                        target.src = `${effectiveQrUrl}${effectiveQrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+                      }
+                    }}
+                    className="block h-full w-full object-contain"
+                  />
+                </div>
+                {degree && (
+                  <span className="mono text-[10px] text-[#A8A8A8]">
+                    {qrInfo?.label || (degree === "UG" || degree === "PG" ? "UG & PG Payment QR" : `${degree} Payment QR`)}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
