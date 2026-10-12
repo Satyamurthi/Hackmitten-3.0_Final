@@ -9,6 +9,21 @@ import {
   generateParticipantId,
   nextRegistrationSequence,
 } from "@/lib/constants";
+import { storeParticipantImage, storePaymentScreenshot, deletePrivateFile } from "@/lib/upload";
+import { sendEmail, approvalEmailHtml, approvalEmailText } from "@/lib/email";
+import { attemptRegistrationAcknowledgement } from "@/lib/registration-acknowledgement";
+import { normalizeTeamName } from "@/lib/team-name";
+
+function sanitizeAdminTeam(team: any) {
+  if (!team) return team;
+  return {
+    ...team,
+    members: team.members?.map(({ participantImagePath, participantImageMimeType, ...member }: any) => ({
+      ...member,
+      hasParticipantImage: Boolean(participantImagePath),
+    })),
+  };
+}
 
 /**
  * GET /api/admin/teams
@@ -21,7 +36,7 @@ export async function GET() {
       select: ADMIN_TEAM_SELECT,
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ teams });
+    return NextResponse.json({ teams: teams.map(sanitizeAdminTeam) });
   } catch (err) {
     return jsonError(err);
   }
@@ -30,37 +45,99 @@ export async function GET() {
 /**
  * POST /api/admin/teams
  * Manually create a team (super admin). Supports immediate approval.
- * Body: { teamName, college, members: [{fullName, email, phone, college, degree}], status: "APPROVED" | "SUBMITTED" }
- *
- * Transactional — either the full team + members + payment are created, or nothing.
+ * Supports JSON or multipart/form-data (with member photos & payment screenshot).
  */
 export async function POST(req: Request) {
+  const storedFiles: string[] = [];
   try {
     const ctx = await requirePermission("team:approve"); // super admin only
-    const body = await req.json();
+
+    let bodyData: any = {};
+    const memberFiles: (File | null)[] = [];
+    let paymentScreenshotFile: File | null = null;
+
+    if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const rawPayload = form.get("registration") || form.get("team");
+      if (typeof rawPayload !== "string") {
+        return NextResponse.json({ error: "Missing team registration details in upload." }, { status: 400 });
+      }
+      try {
+        bodyData = JSON.parse(rawPayload);
+      } catch {
+        return NextResponse.json({ error: "Malformed JSON payload in registration data." }, { status: 400 });
+      }
+
+      for (let i = 0; i < 4; i++) {
+        const file = form.get(`participantImage${i}`);
+        if (file instanceof File && file.size > 0) {
+          memberFiles.push(file);
+        } else {
+          memberFiles.push(null);
+        }
+      }
+
+      const screenshot = form.get("paymentScreenshot");
+      if (screenshot instanceof File && screenshot.size > 0) {
+        paymentScreenshotFile = screenshot;
+      }
+    } else {
+      bodyData = await req.json();
+    }
+
     const parsed = registrationSchema.safeParse({
-      teamName: body.teamName,
-      college: body.college,
-      members: body.members,
+      teamName: bodyData.teamName,
+      college: bodyData.college,
+      members: bodyData.members,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Validation failed", issues: parsed.error.issues }, { status: 400 });
+      const formattedIssues = parsed.error.issues
+        .map((issue) => {
+          const field = issue.path.join(".");
+          return field ? `${field}: ${issue.message}` : issue.message;
+        })
+        .join(" | ");
+      return NextResponse.json(
+        { error: formattedIssues || "Validation failed", issues: parsed.error.issues },
+        { status: 400 },
+      );
     }
+
     const { teamName, college } = parsed.data;
     const members = normalizeRegistrationMembers(parsed.data.members);
-    const wantApproved = body.status === "APPROVED";
+    const wantApproved = bodyData.status === "APPROVED";
+    const transactionId = typeof bodyData.transactionId === "string" ? bodyData.transactionId.trim() : "";
 
-    // Check team name uniqueness
-    const existing = await db.team.findUnique({ where: { teamName } });
-    if (existing) {
+    // Check team name uniqueness (normalized match)
+    const norm = normalizeTeamName(teamName);
+    const matches = await db.$queryRaw<Array<{ teamName: string }>>`
+      SELECT "teamName"
+      FROM "Team"
+      WHERE lower(regexp_replace(trim("teamName"), '\\s+', ' ', 'g')) = ${norm}
+      LIMIT 1
+    `;
+    if (matches.length > 0) {
       return NextResponse.json(
         { error: "Team name already exists. Please choose a different team name.", code: "TEAM_NAME_TAKEN" },
         { status: 409 },
       );
     }
 
+    // Process participant images if provided
+    const storedMemberImages: Array<{ relativePath: string; mimeType: string } | null> = [];
+    for (let i = 0; i < members.length; i++) {
+      const file = memberFiles[i];
+      if (file) {
+        const stored = await storeParticipantImage(file);
+        storedFiles.push(stored.relativePath);
+        storedMemberImages.push(stored);
+      } else {
+        storedMemberImages.push(null);
+      }
+    }
+
     // Transactional creation
-    const result = await db.$transaction(async (tx) => {
+    const { createdTeam, regIdForEmail } = await db.$transaction(async (tx) => {
       const team = await tx.team.create({
         data: {
           teamName,
@@ -73,6 +150,7 @@ export async function POST(req: Request) {
       const createdMembers: Awaited<ReturnType<typeof tx.participant.create>>[] = [];
       for (let i = 0; i < members.length; i++) {
         const m = members[i];
+        const img = storedMemberImages[i];
         const participant = await tx.participant.create({
           data: {
             teamId: team.id,
@@ -82,10 +160,14 @@ export async function POST(req: Request) {
             college: m.college,
             degree: m.degree || null,
             isLeader: m.isLeader,
+            participantImagePath: img?.relativePath ?? null,
+            participantImageMimeType: img?.mimeType ?? null,
           },
         });
         createdMembers.push(participant);
       }
+
+      let generatedRegId: string | null = null;
 
       // If approved, generate registration ID + participant IDs + QR tokens
       if (wantApproved) {
@@ -95,11 +177,11 @@ export async function POST(req: Request) {
           select: { registrationId: true },
         });
         const seq = nextRegistrationSequence(allocatedIds.map((row) => row.registrationId));
-        const regId = generateRegistrationId(seq);
+        generatedRegId = generateRegistrationId(seq);
 
         await tx.team.update({
           where: { id: team.id },
-          data: { status: "APPROVED", registrationId: regId },
+          data: { status: "APPROVED", registrationId: generatedRegId },
         });
 
         for (let i = 0; i < createdMembers.length; i++) {
@@ -112,28 +194,93 @@ export async function POST(req: Request) {
             },
           });
         }
+      }
 
-        // Create a verified payment record (manually approved)
-        await tx.payment.create({
+      // Create payment record
+      const payment = await tx.payment.create({
+        data: {
+          teamId: team.id,
+          transactionId: transactionId || (wantApproved ? `MANUAL-${generatedRegId}` : null),
+          status: wantApproved ? "VERIFIED" : (bodyData.paymentStatus || "SUBMITTED"),
+          verifiedById: wantApproved ? ctx.userId : null,
+          verifiedAt: wantApproved ? new Date() : null,
+        },
+      });
+
+      // Handle payment screenshot if uploaded
+      if (paymentScreenshotFile) {
+        const storedScreenshot = await storePaymentScreenshot({
+          file: paymentScreenshotFile,
+          paymentId: payment.id,
+        });
+        storedFiles.push(storedScreenshot.relativePath);
+        await tx.paymentScreenshot.create({
           data: {
-            teamId: team.id,
-            transactionId: `MANUAL-${regId}`,
-            status: "VERIFIED",
-            verifiedById: ctx.userId,
-            verifiedAt: new Date(),
+            paymentId: payment.id,
+            fileName: storedScreenshot.fileName,
+            filePath: storedScreenshot.relativePath,
+            mimeType: storedScreenshot.mimeType,
+            sizeBytes: storedScreenshot.sizeBytes,
           },
         });
       }
 
-      return tx.team.findUniqueOrThrow({
+      const freshTeam = await tx.team.findUniqueOrThrow({
         where: { id: team.id },
         select: ADMIN_TEAM_SELECT,
       });
+
+      return { createdTeam: freshTeam, regIdForEmail: generatedRegId };
     });
 
+    // ─── Post-creation emails ────────────────────────────────────────────────
+    if (wantApproved && regIdForEmail) {
+      // Send approval emails with digital pass links to all members
+      const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "";
+      const allMembers = await db.participant.findMany({
+        where: { teamId: createdTeam.id },
+        select: { email: true, qrToken: true, fullName: true, participantId: true, isLeader: true },
+      });
 
-    return NextResponse.json({ team: result }, { status: 201 });
+      if (baseUrl) {
+        for (const member of allMembers) {
+          if (!member.email || !member.qrToken) continue;
+          const passUrl = `${baseUrl}/pass/${member.qrToken}`;
+          sendEmail({
+            to: member.email,
+            subject: "Hackmitten 3.0 — Team Approved",
+            html: approvalEmailHtml({
+              participantName: member.fullName,
+              teamName: createdTeam.teamName,
+              registrationId: regIdForEmail,
+              participantId: member.participantId ?? "",
+              passUrl,
+              whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            }),
+            text: approvalEmailText({
+              participantName: member.fullName,
+              teamName: createdTeam.teamName,
+              registrationId: regIdForEmail,
+              participantId: member.participantId ?? "",
+              passUrl,
+              whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            }),
+          }).catch((err) => {
+            console.error("[admin/teams] Failed to send approval email to member:", member.email, err);
+          });
+        }
+      }
+    } else if (!wantApproved) {
+      // Send acknowledgement email to team leader
+      attemptRegistrationAcknowledgement(createdTeam.id).catch((err) => {
+        console.error("[admin/teams] Failed to send registration acknowledgement:", err);
+      });
+    }
+
+    return NextResponse.json({ team: sanitizeAdminTeam(createdTeam) }, { status: 201 });
   } catch (err) {
+    // Clean up stored files if the transaction or handler failed
+    await Promise.allSettled(storedFiles.map(deletePrivateFile));
     return jsonError(err);
   }
 }

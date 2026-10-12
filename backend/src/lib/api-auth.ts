@@ -70,7 +70,9 @@ export function jsonError(err: unknown): Response {
       { status: err.statusCode },
     );
   }
-  console.error("[api] unhandled error:", err);
-  const message = err instanceof Error ? err.message : "An unexpected error occurred.";
-  return Response.json({ error: message || "An unexpected error occurred.", code: "INTERNAL" }, { status: 500 });
+  const sanitizedLog = err instanceof Error
+    ? err.message.replace(/(password|DATABASE_URL|secret|key)=[^\s&'"]+/gi, "$1=[REDACTED]")
+    : String(err);
+  console.error("[api] unhandled error:", sanitizedLog);
+  return Response.json({ error: "An unexpected error occurred.", code: "INTERNAL" }, { status: 500 });
 }

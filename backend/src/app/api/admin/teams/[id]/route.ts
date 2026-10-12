@@ -2,34 +2,96 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission, jsonError } from "@/lib/api-auth";
 import { z } from "zod";
-import { deletePrivateFile } from "@/lib/upload";
+import { deletePrivateFile, storeParticipantImage, storePaymentScreenshot } from "@/lib/upload";
 import { ADMIN_TEAM_SELECT } from "@/lib/admin-team-view";
-import { sendParticipantUpdateEmail, ParticipantUpdateChange } from "@/lib/email";
+import { sendParticipantUpdateEmail, ParticipantUpdateChange, sendEmail, approvalEmailHtml, approvalEmailText } from "@/lib/email";
+import { GMAIL_REGEX } from "@/lib/validators";
+import {
+  generateQrToken,
+  generateRegistrationId,
+  generateParticipantId,
+  nextRegistrationSequence,
+} from "@/lib/constants";
+import { normalizeTeamName } from "@/lib/team-name";
+
+function sanitizeAdminTeam(team: any) {
+  if (!team) return team;
+  return {
+    ...team,
+    members: team.members?.map(({ participantImagePath, participantImageMimeType, ...member }: any) => ({
+      ...member,
+      hasParticipantImage: Boolean(participantImagePath),
+    })),
+  };
+}
 
 /**
  * PATCH /api/admin/teams/:id
- * Edit a team (name, college, member info). SUPER_ADMIN only.
- * Body: { teamName?, college?, members?: [{id?, fullName, email, phone, college}] }
+ * Edit a team (name, college, member info, status, payment). SUPER_ADMIN only.
+ * Supports JSON or multipart/form-data.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const newUploadedFiles: string[] = [];
   try {
-    await requirePermission("team:approve");
+    const ctx = await requirePermission("team:approve");
     const { id } = await params;
-    const body = await req.json();
 
-    const team = await db.team.findUnique({ where: { id }, include: { members: true } });
+    let body: any = {};
+    const memberFiles: (File | null)[] = [];
+    let paymentScreenshotFile: File | null = null;
+
+    if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const rawPayload = form.get("registration") || form.get("team");
+      if (typeof rawPayload !== "string") {
+        return NextResponse.json({ error: "Missing team payload in upload." }, { status: 400 });
+      }
+      try {
+        body = JSON.parse(rawPayload);
+      } catch {
+        return NextResponse.json({ error: "Malformed JSON payload in upload." }, { status: 400 });
+      }
+
+      for (let i = 0; i < 4; i++) {
+        const file = form.get(`participantImage${i}`);
+        if (file instanceof File && file.size > 0) {
+          memberFiles.push(file);
+        } else {
+          memberFiles.push(null);
+        }
+      }
+
+      const screenshot = form.get("paymentScreenshot");
+      if (screenshot instanceof File && screenshot.size > 0) {
+        paymentScreenshotFile = screenshot;
+      }
+    } else {
+      body = await req.json();
+    }
+
+    const team = await db.team.findUnique({
+      where: { id },
+      include: { members: true, payment: { include: { screenshots: true } } },
+    });
     if (!team) return NextResponse.json({ error: "Team not found" }, { status: 404 });
 
-    // Update team name + college
-    const updateData: { teamName?: string; college?: string | null } = {};
-    if (body.teamName && body.teamName !== team.teamName) {
-      const clash = await db.team.findUnique({ where: { teamName: body.teamName } });
-      if (clash && clash.id !== id) {
+    // Update team name + college + status
+    const updateData: { teamName?: string; college?: string | null; status?: "SUBMITTED" | "APPROVED" } = {};
+    if (body.teamName && body.teamName.trim() !== team.teamName) {
+      const norm = normalizeTeamName(body.teamName);
+      const matches = await db.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "Team"
+        WHERE lower(regexp_replace(trim("teamName"), '\\s+', ' ', 'g')) = ${norm}
+          AND "id" != ${id}
+        LIMIT 1
+      `;
+      if (matches.length > 0) {
         return NextResponse.json({ error: "That team name is already in use." }, { status: 409 });
       }
-      updateData.teamName = body.teamName;
+      updateData.teamName = body.teamName.trim();
     }
-    if (body.college !== undefined) updateData.college = body.college || null;
+    if (body.college !== undefined) updateData.college = body.college.trim() || null;
 
     const teamNameChanged = Boolean(updateData.teamName && updateData.teamName !== team.teamName);
     const collegeChanged = Boolean(updateData.college !== undefined && updateData.college !== team.college);
@@ -42,23 +104,52 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       changes: ParticipantUpdateChange[];
     }> = [];
 
+    const oldFilesToDelete: string[] = [];
+
     // Update members if provided
+    let parsedMembers: any[] | null = null;
     if (Array.isArray(body.members)) {
-      const membersSchema = z.array(z.object({
-        id: z.string().optional(),
-        fullName: z.string().min(2).max(100),
-        email: z.string().email(),
-        phone: z.string().min(10).max(15).regex(/^[+]?[\d\s\-()]+$/),
-        college: z.string().min(2).max(150),
-        degree: z.string().max(60).optional().or(z.literal("")),
-      })).min(3, "Minimum 3 members").max(4, "Maximum 4 members");
+      const membersSchema = z
+        .array(
+          z.object({
+            id: z.string().optional(),
+            fullName: z.string().min(2, "Full name must be at least 2 characters").max(100).regex(/^[^\d]*$/, "Name cannot contain numbers"),
+            email: z.string().trim().regex(GMAIL_REGEX, "Email must be a valid @gmail.com address"),
+            phone: z.string().trim().regex(/^[6-9][0-9]{9}$/, "Phone must be a valid 10-digit Indian mobile number"),
+            college: z.string().min(2, "College name must be at least 2 characters").max(150).regex(/^[^\d]*$/, "College name cannot contain numbers"),
+            degree: z.string().trim().min(1, "Degree is required").max(60),
+          })
+        )
+        .min(3, "Minimum 3 members required")
+        .max(4, "Maximum 4 members allowed")
+        .superRefine((membersList, ctxRef) => {
+          const emails = membersList.map((m) => m.email.toLowerCase().trim());
+          const seen = new Set<string>();
+          emails.forEach((email, idx) => {
+            if (seen.has(email)) {
+              ctxRef.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [idx, "email"],
+                message: "Duplicate email within team",
+              });
+            }
+            seen.add(email);
+          });
+        });
 
       const parsed = membersSchema.safeParse(body.members);
       if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid members", issues: parsed.error.issues }, { status: 400 });
+        const issuesSummary = parsed.error.issues
+          .map((i) => {
+            const p = i.path.join(".");
+            return p ? `${p}: ${i.message}` : i.message;
+          })
+          .join(" | ");
+        return NextResponse.json({ error: issuesSummary || "Invalid members", issues: parsed.error.issues }, { status: 400 });
       }
-      // Transactional member update
-      const newMemberIds = parsed.data.filter((m) => m.id).map((m) => m.id!);
+      parsedMembers = parsed.data;
+
+      const newMemberIds = parsedMembers.filter((m) => m.id).map((m) => m.id!);
       const currentMemberIds = new Set(team.members.map((member) => member.id));
       if (new Set(newMemberIds).size !== newMemberIds.length || newMemberIds.some((memberId) => !currentMemberIds.has(memberId))) {
         return NextResponse.json({ error: "Member IDs must be unique and belong to this team" }, { status: 400 });
@@ -70,8 +161,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         );
       }
 
-      // Collect changes per member for email notifications
-      for (const newM of parsed.data) {
+      // Collect change log for participant update emails
+      for (const newM of parsedMembers) {
         const changes: ParticipantUpdateChange[] = [];
         const oldM = newM.id ? team.members.find((m) => m.id === newM.id) : null;
 
@@ -116,69 +207,179 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           }
         }
       }
+    }
 
-      const removedImagePaths = team.members
-        .filter((member) => !newMemberIds.includes(member.id) && member.participantImagePath)
-        .map((member) => member.participantImagePath!);
-      await db.$transaction(async (tx) => {
-        if (Object.keys(updateData).length > 0) {
-          await tx.team.update({ where: { id }, data: updateData });
+    // Process new member images
+    const storedMemberImages: Array<{ relativePath: string; mimeType: string } | null> = [];
+    if (parsedMembers) {
+      for (let i = 0; i < parsedMembers.length; i++) {
+        const file = memberFiles[i];
+        if (file) {
+          const stored = await storeParticipantImage(file);
+          newUploadedFiles.push(stored.relativePath);
+          storedMemberImages.push(stored);
+        } else {
+          storedMemberImages.push(null);
         }
+      }
+    }
 
-        // Delete members not in the new list
+    // Handle status change request
+    const wantApproved = body.status === "APPROVED";
+    let needsPassGeneration = false;
+    if (wantApproved && team.status !== "APPROVED") {
+      updateData.status = "APPROVED";
+      needsPassGeneration = true;
+    }
+
+    let newlyApprovedRegId: string | null = null;
+
+    // Database transaction
+    await db.$transaction(async (tx) => {
+      // 1. Update team basic info
+      if (Object.keys(updateData).length > 0) {
+        await tx.team.update({ where: { id }, data: updateData });
+      }
+
+      // 2. Update members if provided
+      if (parsedMembers) {
+        const newMemberIds = parsedMembers.filter((m) => m.id).map((m) => m.id!);
+        // Delete members removed from list
+        const removedMembers = team.members.filter((member) => !newMemberIds.includes(member.id));
+        for (const rem of removedMembers) {
+          if (rem.participantImagePath) oldFilesToDelete.push(rem.participantImagePath);
+        }
         await tx.participant.deleteMany({
           where: { teamId: id, id: { notIn: newMemberIds } },
         });
 
         // Upsert members
-        for (const [index, m] of parsed.data.entries()) {
+        for (let i = 0; i < parsedMembers.length; i++) {
+          const m = parsedMembers[i];
+          const newImg = storedMemberImages[i];
+          const oldM = m.id ? team.members.find((existing) => existing.id === m.id) : null;
+
+          const memberData: any = {
+            fullName: m.fullName.trim(),
+            email: m.email.toLowerCase().trim(),
+            phone: m.phone.trim(),
+            college: m.college.trim(),
+            degree: m.degree ? m.degree.trim() : null,
+            isLeader: i === 0,
+          };
+
+          if (newImg) {
+            memberData.participantImagePath = newImg.relativePath;
+            memberData.participantImageMimeType = newImg.mimeType;
+            if (oldM?.participantImagePath) {
+              oldFilesToDelete.push(oldM.participantImagePath);
+            }
+          }
+
           if (m.id) {
             await tx.participant.update({
               where: { id: m.id },
-              data: {
-                fullName: m.fullName,
-                email: m.email.toLowerCase().trim(),
-                phone: m.phone.trim(),
-                college: m.college,
-                degree: m.degree || null,
-                isLeader: index === 0,
-              },
+              data: memberData,
             });
           } else {
             await tx.participant.create({
               data: {
                 teamId: id,
-                fullName: m.fullName,
-                email: m.email.toLowerCase().trim(),
-                phone: m.phone.trim(),
-                college: m.college,
-                degree: m.degree || null,
-                isLeader: index === 0,
+                ...memberData,
               },
             });
           }
         }
-      });
-      await Promise.allSettled(removedImagePaths.map(deletePrivateFile));
-    } else if (Object.keys(updateData).length > 0) {
-      await db.team.update({ where: { id }, data: updateData });
+      }
 
-      if (teamNameChanged || collegeChanged) {
-        for (const m of team.members) {
-          const changes: ParticipantUpdateChange[] = [];
-          if (teamNameChanged) changes.push({ field: "Team Name", from: team.teamName, to: effectiveTeamName });
-          if (collegeChanged) changes.push({ field: "College", from: team.college || "—", to: updateData.college || "—" });
-          if (changes.length > 0) {
-            emailNotifications.push({
-              to: m.email.trim(),
-              participantName: m.fullName,
-              teamName: effectiveTeamName,
-              changes,
+      // 3. Handle pass generation if transitioning to APPROVED
+      if (needsPassGeneration) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('hackmitten-registration-sequence'))`;
+        let regId = team.registrationId;
+        if (!regId) {
+          const allocatedIds = await tx.team.findMany({
+            where: { registrationId: { not: null } },
+            select: { registrationId: true },
+          });
+          const seq = nextRegistrationSequence(allocatedIds.map((row) => row.registrationId));
+          regId = generateRegistrationId(seq);
+          newlyApprovedRegId = regId;
+
+          await tx.team.update({
+            where: { id },
+            data: { status: "APPROVED", registrationId: regId },
+          });
+
+          const currentMembers = await tx.participant.findMany({
+            where: { teamId: id },
+            orderBy: [{ isLeader: "desc" }, { createdAt: "asc" }],
+          });
+
+          for (let index = 0; index < currentMembers.length; index++) {
+            await tx.participant.update({
+              where: { id: currentMembers[index].id },
+              data: {
+                participantId: generateParticipantId(seq, index + 1),
+                qrToken: generateQrToken(),
+                passVerified: true,
+              },
             });
           }
         }
       }
-    }
+
+      // 4. Update / create payment record
+      const transactionId = typeof body.transactionId === "string" ? body.transactionId.trim() : undefined;
+      const paymentStatus = body.paymentStatus || (wantApproved ? "VERIFIED" : undefined);
+
+      let paymentId = team.payment?.id;
+      if (team.payment) {
+        const paymentUpdate: any = {};
+        if (transactionId !== undefined) paymentUpdate.transactionId = transactionId || null;
+        if (paymentStatus) {
+          paymentUpdate.status = paymentStatus;
+          if (paymentStatus === "VERIFIED") {
+            paymentUpdate.verifiedById = ctx.userId;
+            paymentUpdate.verifiedAt = new Date();
+          }
+        }
+        if (Object.keys(paymentUpdate).length > 0) {
+          await tx.payment.update({ where: { id: team.payment.id }, data: paymentUpdate });
+        }
+      } else if (transactionId || paymentStatus || paymentScreenshotFile) {
+        const createdPay = await tx.payment.create({
+          data: {
+            teamId: id,
+            transactionId: transactionId || (wantApproved ? `MANUAL-${newlyApprovedRegId || team.registrationId}` : null),
+            status: paymentStatus || (wantApproved ? "VERIFIED" : "SUBMITTED"),
+            verifiedById: (paymentStatus === "VERIFIED" || wantApproved) ? ctx.userId : null,
+            verifiedAt: (paymentStatus === "VERIFIED" || wantApproved) ? new Date() : null,
+          },
+        });
+        paymentId = createdPay.id;
+      }
+
+      // 5. Handle payment screenshot upload
+      if (paymentScreenshotFile && paymentId) {
+        const storedScreenshot = await storePaymentScreenshot({
+          file: paymentScreenshotFile,
+          paymentId,
+        });
+        newUploadedFiles.push(storedScreenshot.relativePath);
+        await tx.paymentScreenshot.create({
+          data: {
+            paymentId,
+            fileName: storedScreenshot.fileName,
+            filePath: storedScreenshot.relativePath,
+            mimeType: storedScreenshot.mimeType,
+            sizeBytes: storedScreenshot.sizeBytes,
+          },
+        });
+      }
+    });
+
+    // Cleanup replaced files
+    await Promise.allSettled(oldFilesToDelete.map(deletePrivateFile));
 
     // Send notifications to updated participants
     if (emailNotifications.length > 0) {
@@ -191,10 +392,50 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       );
     }
 
+    // Send approval emails if team was newly approved
+    if (needsPassGeneration && newlyApprovedRegId) {
+      const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "";
+      const allMembers = await db.participant.findMany({
+        where: { teamId: id },
+        select: { email: true, qrToken: true, fullName: true, participantId: true, isLeader: true },
+      });
+
+      if (baseUrl) {
+        for (const member of allMembers) {
+          if (!member.email || !member.qrToken) continue;
+          const passUrl = `${baseUrl}/pass/${member.qrToken}`;
+          sendEmail({
+            to: member.email,
+            subject: "Hackmitten 3.0 — Team Approved",
+            html: approvalEmailHtml({
+              participantName: member.fullName,
+              teamName: effectiveTeamName,
+              registrationId: newlyApprovedRegId,
+              participantId: member.participantId ?? "",
+              passUrl,
+              whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            }),
+            text: approvalEmailText({
+              participantName: member.fullName,
+              teamName: effectiveTeamName,
+              registrationId: newlyApprovedRegId,
+              participantId: member.participantId ?? "",
+              passUrl,
+              whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            }),
+          }).catch((err) => {
+            console.error("[admin/teams] Failed to send approval email on edit:", member.email, err);
+          });
+        }
+      }
+    }
+
     const updated = await db.team.findUniqueOrThrow({ where: { id }, select: ADMIN_TEAM_SELECT });
 
-    return NextResponse.json({ team: updated });
+    return NextResponse.json({ team: sanitizeAdminTeam(updated) });
   } catch (err) {
+    // If failure happened, clean up newly uploaded files
+    await Promise.allSettled(newUploadedFiles.map(deletePrivateFile));
     return jsonError(err);
   }
 }

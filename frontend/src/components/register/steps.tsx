@@ -875,15 +875,12 @@ function Input({
   );
 }
 
-// ─── DEGREE FIELD (dropdown + custom text input) ─────────────────────────────
+// ─── DEGREE FIELD (UG / PG / Diploma only) ───────────────────────────────────
 
 const DEGREE_OPTIONS = [
-  "B.E",
-  "B.Tech",
-  "MCA",
-  "BCA",
+  "UG",
+  "PG",
   "Diploma",
-  "Other",
 ];
 
 function DegreeField({
@@ -895,26 +892,13 @@ function DegreeField({
   onChange: (v: string) => void;
   error?: string;
 }) {
-  // Determine if the current value is one of the preset options (not "Other")
-  const isPreset = DEGREE_OPTIONS.includes(value) && value !== "Other";
-  const isOtherSelected = !isPreset && value !== "" && !DEGREE_OPTIONS.includes(value);
-  // The select's value: show "Other" when the stored value is custom (or "Other")
-  const selectValue = isOtherSelected || value === "Other" ? "Other" : isPreset ? value : "";
-
   return (
     <div>
       <label className="block">
         <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Degree</span>
         <select
-          value={selectValue}
-          onChange={(e) => {
-            if (e.target.value === "Other") {
-              // Switching to "Other" — keep existing custom text if any, else empty
-              onChange(isOtherSelected ? value : "");
-            } else {
-              onChange(e.target.value);
-            }
-          }}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           className="mt-1 w-full bg-transparent border-b border-white/15 py-2 text-base text-white focus:border-[#B52A32] focus:outline-none transition-colors appearance-none cursor-pointer"
         >
           <option value="" disabled className="bg-[#080808] text-[#A8A8A8]">Select degree</option>
@@ -926,19 +910,6 @@ function DegreeField({
         </select>
       </label>
       {error && <div className="mt-1 text-xs text-[#D83A43]">{error}</div>}
-      {(isOtherSelected || selectValue === "Other") && (
-        <label className="block mt-2">
-          <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Specify your degree</span>
-          <input
-            type="text"
-            value={isOtherSelected ? value : ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Enter your degree"
-            maxLength={60}
-            className="mt-1 w-full bg-transparent border-b border-white/15 py-2 text-base text-white placeholder:text-[#A8A8A8]/40 focus:border-[#B52A32] focus:outline-none transition-colors"
-          />
-        </label>
-      )}
     </div>
   );
 }

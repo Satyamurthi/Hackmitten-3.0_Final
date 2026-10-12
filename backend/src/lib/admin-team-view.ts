@@ -19,8 +19,21 @@ export const ADMIN_TEAM_SELECT = {
       degree: true,
       isLeader: true,
       participantId: true,
+      participantImagePath: true,
+      participantImageMimeType: true,
+      qrToken: true,
+      passVerified: true,
     },
     orderBy: [{ isLeader: "desc" }, { createdAt: "asc" }],
   },
-  payment: { select: { id: true, status: true, transactionId: true } },
+  payment: {
+    select: {
+      id: true,
+      status: true,
+      transactionId: true,
+      screenshots: {
+        select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+      },
+    },
+  },
 } as const satisfies Prisma.TeamSelect;

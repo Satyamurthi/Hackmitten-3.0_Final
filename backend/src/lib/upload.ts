@@ -7,7 +7,7 @@ const UPLOAD_ROOT = path.resolve(/*turbopackIgnore: true*/ process.env.HM3_PUBLI
 const PRIVATE_UPLOAD_ROOT = path.resolve(/*turbopackIgnore: true*/ process.env.HM3_PRIVATE_UPLOAD_DIR || path.join(STORAGE_ROOT, "private"));
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const PARTICIPANT_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_SIZE = 15 * 1024 * 1024;
+const MAX_SIZE = 8 * 1024 * 1024;
 export const MAX_PARTICIPANT_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export class UploadError extends Error {
@@ -97,6 +97,9 @@ export async function validateImageFile(file: File, options: { maxSize?: number;
       throw new UploadError("The selected image is malformed or does not match its declared type.");
     }
     await sharp(bytes, { failOn: "error", limitInputPixels: 12_000_000 }).stats();
+    if (!hasStrictImageBoundary(bytes, detected)) {
+      throw new UploadError("The selected image has unexpected trailing data.");
+    }
   } catch (error) {
     if (error instanceof UploadError) throw error;
     throw new UploadError("The selected image is malformed or cannot be decoded.");
