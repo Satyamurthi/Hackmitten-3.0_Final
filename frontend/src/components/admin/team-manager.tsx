@@ -390,8 +390,8 @@ function TeamFormModal({
     if (!effectiveDegree || !["Diploma", "UG", "PG"].includes(effectiveDegree)) {
       issues.push("Degree category is required (Diploma, UG, PG)");
     }
-    if (availableDomains.length > 0 && !domainId) {
-      issues.push(`Please select an applicable competition domain for ${effectiveDegree || degree}`);
+    if (!domainId || !domainId.trim()) {
+      issues.push(`Please select an applicable competition domain for ${effectiveDegree || degree || "the team"}`);
     }
     if (leaderCount !== 1) issues.push("Exactly one team leader must be designated");
     if (members.length < 3 || members.length > 4) issues.push("Team must have 3 or 4 members");
@@ -614,14 +614,14 @@ function TeamFormModal({
               <div>
                 <label className="block">
                   <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-                    Competition Domain {availableDomains.length > 0 && <span className="text-[#D83A43]">*</span>}
+                    Competition Domain <span className="text-[#D83A43]">*</span>
                   </span>
                   <select
                     value={domainId}
                     onChange={(e) => setDomainId(e.target.value)}
                     disabled={!degree || domainsLoading}
                     className={`mt-1 w-full bg-[#080808] border rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none disabled:opacity-50 transition-colors ${
-                      attemptedSubmit && availableDomains.length > 0 && !domainId ? "border-[#B52A32] bg-red-950/20" : "border-white/10"
+                      attemptedSubmit && !domainId ? "border-[#B52A32] bg-red-950/20" : "border-white/10"
                     }`}
                   >
                     <option value="">
@@ -640,7 +640,7 @@ function TeamFormModal({
                     ))}
                   </select>
                 </label>
-                {attemptedSubmit && availableDomains.length > 0 && !domainId && (
+                {attemptedSubmit && !domainId && (
                   <p className="text-xs text-[#D83A43] mt-1 flex items-center gap-1 font-medium">
                     <AlertCircle size={12} className="shrink-0" /> Domain selection is required
                   </p>

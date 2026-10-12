@@ -479,12 +479,11 @@ export function StepDetails() {
     }
   }, [domainId, availableDomains, setDomain]);
 
-  const hasDomains = availableDomains.length > 0;
-  const domainSelected = !hasDomains || Boolean(domainId);
+  const domainSelected = Boolean(domainId && domainId.trim());
   const canProceed = !domainsLoading && domainSelected;
 
   const handleProceed = () => {
-    if (!canProceed) {
+    if (!domainId || !domainId.trim()) {
       setAttemptedContinue(true);
       return;
     }
@@ -505,9 +504,9 @@ export function StepDetails() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">
-              Competition Domain {hasDomains && <span className="text-[#D83A43]">*</span>}
+              Competition Domain <span className="text-[#D83A43]">*</span>
             </span>
-            {hasDomains && !domainId && (
+            {!domainId && (
               <span className="text-xs text-[#D83A43]">· Required</span>
             )}
           </div>
@@ -524,7 +523,7 @@ export function StepDetails() {
           </div>
         ) : availableDomains.length === 0 ? (
           <div className="p-6 rounded-xl border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
-            No specialized domains configured for {degree}. All teams participate in the general track.
+            No specialized domains configured for {degree}. Please contact admin.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -555,10 +554,12 @@ export function StepDetails() {
           </div>
         )}
 
-        {hasDomains && !domainId && attemptedContinue && (
-          <div className="p-3.5 rounded-lg bg-[#B52A32]/10 border border-[#B52A32]/30 text-xs text-[#D83A43] flex items-center gap-2">
-            <AlertCircle size={15} className="shrink-0" />
-            <span>Please select a competition domain before continuing to payment.</span>
+        {!domainId && (
+          <div className="p-3.5 rounded-lg bg-[#B52A32]/15 border border-[#B52A32]/40 text-xs text-[#D83A43] flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span className="font-semibold">
+              Competition domain is required. You cannot proceed to the next page without selecting a domain.
+            </span>
           </div>
         )}
       </div>
@@ -580,13 +581,9 @@ export function StepDetails() {
               <span className="mono text-xs px-2.5 py-1 rounded bg-[#B52A32]/10 border border-[#B52A32]/30 text-[#D83A43] font-semibold">
                 Domain: {domainName}
               </span>
-            ) : hasDomains ? (
-              <span className="mono text-xs px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold">
-                Domain: Not selected
-              </span>
             ) : (
-              <span className="mono text-xs px-2.5 py-1 rounded bg-white/10 border border-white/10 text-white font-semibold">
-                General Track
+              <span className="mono text-xs px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold">
+                Domain: Selection Required
               </span>
             )}
           </div>
@@ -652,6 +649,13 @@ export function StepPayment() {
   } = useRegisterStore();
 
   const fee = degree === "Diploma" ? "₹500" : "₹1,000";
+
+  // Guard: Restrict access if no domain has been selected
+  useEffect(() => {
+    if (!domainId || !domainId.trim()) {
+      useRegisterStore.getState().setStep(2);
+    }
+  }, [domainId]);
 
   // Query degree-specific payment QR info
   const { data: qrInfo, isLoading: qrLoading } = useQuery<{
