@@ -89,25 +89,36 @@ export const useRegisterStore = create<RegisterState>((set) => ({
         degree: d,
         domainId: resetDomain ? "" : st.domainId,
         domainName: resetDomain ? "" : st.domainName,
-        // Also prefill members if they don't have degree yet
+        // Team lead degree is final for all and auto-selected for all members
         members: st.members.map((m) => ({
           ...m,
-          degree: m.degree ? m.degree : d,
+          degree: d,
         })),
       };
     }),
   setDomain: (id, name) => set({ domainId: id, domainName: name }),
   setMember: (idx, m) =>
-    set((st) => ({
-      members: st.members.map((mem, i) => (i === idx ? { ...mem, ...m } : mem)),
-    })),
+    set((st) => {
+      if (idx === 0 && m.degree && (m.degree === "Diploma" || m.degree === "UG" || m.degree === "PG")) {
+        const resetDomain = st.degree !== m.degree;
+        return {
+          members: st.members.map((mem, i) => (i === 0 ? { ...mem, ...m } : { ...mem, degree: m.degree! })),
+          degree: m.degree as DegreeCategory,
+          domainId: resetDomain ? "" : st.domainId,
+          domainName: resetDomain ? "" : st.domainName,
+        };
+      }
+      return {
+        members: st.members.map((mem, i) => (i === idx ? { ...mem, ...m } : mem)),
+      };
+    }),
   addMember: () =>
     set((st) =>
       st.members.length < 4
         ? {
             members: [
               ...st.members,
-              { ...emptyMember(), degree: st.degree || "" },
+              { ...emptyMember(), degree: st.degree || st.members[0]?.degree || "" },
             ],
           }
         : st,

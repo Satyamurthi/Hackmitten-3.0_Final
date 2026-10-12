@@ -131,6 +131,16 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
+    } else if (degree) {
+      const activeDomainsForDegree = await db.domain.count({
+        where: { degrees: { has: degree }, enabled: true },
+      });
+      if (activeDomainsForDegree > 0) {
+        return NextResponse.json(
+          { error: `Please select an applicable competition domain for ${degree}.` },
+          { status: 400 },
+        );
+      }
     }
 
     const participantImages: Array<Awaited<ReturnType<typeof storeParticipantImage>>> = [];

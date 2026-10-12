@@ -385,9 +385,13 @@ function TeamFormModal({
     if (teamNameHasInvalid) issues.push("Team name has invalid characters");
     if (!college.trim() || college.trim().length < 2) issues.push("College name must be at least 2 characters");
     if (collegeHasDigits) issues.push("College name cannot contain numbers");
-    if (!degree) issues.push("Degree category is required (Diploma, UG, PG)");
+    
+    const effectiveDegree = degree || (members.find((m) => m.isLeader)?.degree as any) || members[0]?.degree;
+    if (!effectiveDegree || !["Diploma", "UG", "PG"].includes(effectiveDegree)) {
+      issues.push("Degree category is required (Diploma, UG, PG)");
+    }
     if (availableDomains.length > 0 && !domainId) {
-      issues.push(`Please select an applicable competition domain for ${degree}`);
+      issues.push(`Please select an applicable competition domain for ${effectiveDegree || degree}`);
     }
     if (leaderCount !== 1) issues.push("Exactly one team leader must be designated");
     if (members.length < 3 || members.length > 4) issues.push("Team must have 3 or 4 members");
@@ -419,6 +423,7 @@ function TeamFormModal({
     const clientIssues = validateForm();
     if (clientIssues.length > 0) {
       setError("Please correct the errors highlighted below before proceeding.");
+      setServerIssues(clientIssues);
       return;
     }
 
@@ -615,7 +620,9 @@ function TeamFormModal({
                     value={domainId}
                     onChange={(e) => setDomainId(e.target.value)}
                     disabled={!degree || domainsLoading}
-                    className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none disabled:opacity-50"
+                    className={`mt-1 w-full bg-[#080808] border rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none disabled:opacity-50 transition-colors ${
+                      attemptedSubmit && availableDomains.length > 0 && !domainId ? "border-[#B52A32] bg-red-950/20" : "border-white/10"
+                    }`}
                   >
                     <option value="">
                       {!degree
@@ -624,7 +631,7 @@ function TeamFormModal({
                         ? "Loading domains…"
                         : availableDomains.length === 0
                         ? "No domains registered for this degree"
-                        : "Select Domain"}
+                        : "Select Domain *"}
                     </option>
                     {availableDomains.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -854,7 +861,16 @@ function TeamFormModal({
                       <div className="sm:col-span-2">
                         <AdminDegreeField
                           value={m.degree}
-                          onChange={(v) => setMember(i, { degree: v })}
+                          readOnly={!m.isLeader}
+                          subtitle="Auto-synced with Leader (Read-only)"
+                          onChange={(v) => {
+                            setMember(i, { degree: v });
+                            if (m.isLeader) {
+                              setDegree(v as any);
+                              // Auto-select for all team members
+                              setMembers((ms) => ms.map((mm) => ({ ...mm, degree: v })));
+                            }
+                          }}
                           error={degreeError}
                         />
                       </div>
@@ -1039,30 +1055,48 @@ function AdminDegreeField({
   value,
   onChange,
   error,
+  readOnly,
+  subtitle,
 }: {
   value: string;
   onChange: (v: string) => void;
   error?: string;
+  readOnly?: boolean;
+  subtitle?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <label className="block">
-        <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-          Degree <span className="text-[#D83A43]">*</span>
-        </span>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none"
-        >
-          <option value="" disabled>Select degree *</option>
-          {!ADMIN_DEGREE_OPTIONS.includes(value) && value && (
-            <option value={value}>{value}</option>
+        <div className="flex items-center justify-between">
+          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+            Degree <span className="text-[#D83A43]">*</span>
+          </span>
+          {readOnly && (
+            <span className="mono text-[10px] text-[#D83A43] uppercase tracking-wider font-semibold">
+              {subtitle || "Auto-selected with Leader (Read-only)"}
+            </span>
           )}
-          {ADMIN_DEGREE_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
+        </div>
+        {readOnly ? (
+          <div className="mt-1 w-full bg-[#080808]/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90 flex items-center justify-between cursor-not-allowed select-none">
+            <span className="font-medium text-white">{value || "Awaiting Leader's selection"}</span>
+            <span className="text-[10px] text-[#A8A8A8] mono">Fixed for all members</span>
+          </div>
+        ) : (
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none"
+          >
+            <option value="" disabled>Select degree *</option>
+            {!ADMIN_DEGREE_OPTIONS.includes(value) && value && (
+              <option value={value}>{value}</option>
+            )}
+            {ADMIN_DEGREE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        )}
       </label>
       {error && (
         <p className="text-xs text-[#D83A43] flex items-center gap-1 font-medium">

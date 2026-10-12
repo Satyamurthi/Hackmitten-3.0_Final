@@ -144,6 +144,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         updateData.domainId = dom.id;
         updateData.domainName = dom.name;
       } else {
+        const effectiveDegree = updateData.degree !== undefined ? updateData.degree : team.degree;
+        if (effectiveDegree) {
+          const activeDomainsCount = await db.domain.count({
+            where: { degrees: { has: effectiveDegree }, enabled: true },
+          });
+          if (activeDomainsCount > 0) {
+            return NextResponse.json(
+              { error: `Please select an applicable competition domain for ${effectiveDegree}.` },
+              { status: 400 },
+            );
+          }
+        }
         updateData.domainId = null;
         updateData.domainName = null;
       }

@@ -17,6 +17,8 @@ export async function GET(req: Request) {
         orderBy: { updatedAt: "desc" },
       });
 
+      const fee = degree === "Diploma" ? "₹500" : "₹1,000";
+
       if (qrRecord) {
         return NextResponse.json({
           configured: true,
@@ -25,6 +27,7 @@ export async function GET(req: Request) {
           label: qrRecord.label || `${degree} Payment QR`,
           degrees: qrRecord.degrees,
           degree,
+          fee,
         });
       }
 
@@ -37,6 +40,7 @@ export async function GET(req: Request) {
           label: "UG & PG Payment QR",
           degrees: ["UG", "PG"],
           degree,
+          fee,
         });
       }
 
@@ -46,6 +50,7 @@ export async function GET(req: Request) {
         upiId: "9364008472@kotak",
         message: `Payment QR code has not been configured for ${degree}. Please contact the event administrator.`,
         degree,
+        fee,
       });
     }
 
@@ -62,6 +67,7 @@ export async function GET(req: Request) {
         upiId: latestQr.upiId || "9364008472@kotak",
         label: latestQr.label || "UG & PG Payment QR",
         degrees: latestQr.degrees,
+        fee: "₹1,000",
       });
     }
 
@@ -71,6 +77,7 @@ export async function GET(req: Request) {
       upiId: "9364008472@kotak",
       label: "UG & PG Payment QR",
       degrees: ["UG", "PG"],
+      fee: "₹1,000",
     });
   } catch {
     return NextResponse.json({

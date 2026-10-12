@@ -8,7 +8,7 @@ import Link from "next/link";
 import { normalizeTeamName } from "@/lib/team-name";
 import { compressImage } from "@/lib/image-compress";
 
-const STEPS = ["TEAM", "MEMBERS", "DETAILS", "PAYMENT", "SUBMIT"];
+const STEPS = ["TEAM", "MEMBERS", "DOMAIN", "PAYMENT", "SUBMIT"];
 
 export function RegisterStepper() {
   const step = useRegisterStore((s) => s.step);
@@ -54,11 +54,6 @@ export function StepTeam() {
   const {
     teamName,
     setTeamName,
-    degree,
-    setDegree,
-    domainId,
-    domainName,
-    setDomain,
     next,
   } = useRegisterStore();
   const normalizedTeamName = normalizeTeamName(teamName);
@@ -81,30 +76,6 @@ export function StepTeam() {
     staleTime: 30_000,
   });
 
-  // Degree-based domain filtering
-  const { data: domainsData, isLoading: domainsLoading } = useQuery<{ domains: Array<{ id: string; name: string; degrees: string[] }> }>({
-    queryKey: ["domains-for-degree", degree],
-    queryFn: async () => {
-      if (!degree) return { domains: [] };
-      const r = await fetch(`/api/domains?degree=${encodeURIComponent(degree)}`);
-      if (!r.ok) return { domains: [] };
-      return r.json();
-    },
-    enabled: Boolean(degree),
-  });
-
-  const availableDomains = domainsData?.domains || [];
-
-  // Reset selected domain if no longer valid for selected degree
-  useEffect(() => {
-    if (domainId && availableDomains.length > 0) {
-      const match = availableDomains.find((d) => d.id === domainId);
-      if (!match) {
-        setDomain("", "");
-      }
-    }
-  }, [domainId, availableDomains, setDomain]);
-
   const checking = validFormat && (debouncedTeamName !== normalizedTeamName || isFetching);
   const availability = !validFormat
     ? "invalid"
@@ -118,17 +89,14 @@ export function StepTeam() {
             ? "available"
             : "error";
 
-  const hasDomains = availableDomains.length > 0;
-  const domainSelected = !hasDomains || Boolean(domainId);
-  const degreeSelected = Boolean(degree);
-  const valid = availability === "available" && degreeSelected && domainSelected;
+  const valid = availability === "available";
 
   return (
     <div className="max-w-xl mx-auto space-y-8">
       <div>
         <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">NAME YOUR CREW.</h2>
         <p className="text-sm md:text-base text-[#A8A8A8]">
-          Pick your team name, select your degree, and choose your competition domain.
+          Choose a unique team name to get started. Participants will specify their degree category in the next step.
         </p>
       </div>
 
@@ -170,92 +138,6 @@ export function StepTeam() {
         )}
       </div>
 
-      {/* Degree Category Selection */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-            Degree Category *
-          </span>
-          <span className="text-xs text-[#A8A8A8]/60">Select Diploma, UG, or PG</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {(["Diploma", "UG", "PG"] as const).map((deg) => {
-            const isSelected = degree === deg;
-            return (
-              <button
-                type="button"
-                key={deg}
-                onClick={() => setDegree(deg)}
-                className={`py-3.5 px-4 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 min-h-[58px] ${
-                  isSelected
-                    ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-lg shadow-[#B52A32]/10"
-                    : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <span className="font-bold text-sm tracking-wide">{deg}</span>
-                {isSelected && (
-                  <span className="mono text-[9px] text-[#D83A43] uppercase tracking-widest flex items-center gap-1">
-                    <Check size={10} /> Selected
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Domain Selection */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-            Competition Domain {hasDomains && "*"}
-          </span>
-          {degree && (
-            <span className="text-xs text-[#B52A32] font-mono">
-              Filtered for {degree}
-            </span>
-          )}
-        </div>
-
-        {!degree ? (
-          <div className="p-4 rounded-lg border border-dashed border-white/10 bg-[#080808]/50 text-center text-xs text-[#A8A8A8]">
-            Select your Degree above to view compatible domains.
-          </div>
-        ) : domainsLoading ? (
-          <div className="p-4 rounded-lg border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
-            Loading available domains for {degree}…
-          </div>
-        ) : availableDomains.length === 0 ? (
-          <div className="p-4 rounded-lg border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
-            No domains currently registered for {degree}. (General participation)
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {availableDomains.map((dom) => {
-              const isSelected = domainId === dom.id;
-              return (
-                <button
-                  type="button"
-                  key={dom.id}
-                  onClick={() => setDomain(dom.id, dom.name)}
-                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                    isSelected
-                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-md shadow-[#B52A32]/10"
-                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/25 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm text-white truncate">{dom.name}</div>
-                    <div className="text-[10px] text-[#A8A8A8] mt-0.5 mono">Eligible: {degree}</div>
-                  </div>
-                  {isSelected && <Check size={16} className="text-[#D83A43] shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
       <div className="pt-2 flex items-center justify-between">
         <Link
           href="/"
@@ -278,7 +160,7 @@ export function StepTeam() {
 // ─── STEP 1: MEMBERS ──────────────────────────────────────────────────────────
 
 export function StepMembers() {
-  const { members, setMember, addMember, removeMember, next, prev } = useRegisterStore();
+  const { members, setMember, addMember, removeMember, next, prev, degree, setDegree } = useRegisterStore();
   const [attemptedContinue, setAttemptedContinue] = useState(false);
 
   const GMAIL_REGEX = /^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*@gmail\.com$/i;
@@ -288,7 +170,7 @@ export function StepMembers() {
     const collegeValid = m.college.trim().length >= 2 && !/\d/.test(m.college);
     const emailValid = GMAIL_REGEX.test(m.email.trim());
     const phoneValid = /^[6-9][0-9]{9}$/.test(m.phone.trim());
-    const degreeValid = m.degree.trim().length > 0;
+    const degreeValid = m.degree.trim().length > 0 && ["UG", "PG", "Diploma"].includes(m.degree.trim());
     const imgSelected = Boolean(m.participantImage);
     const imgValid =
       imgSelected &&
@@ -309,6 +191,10 @@ export function StepMembers() {
       setAttemptedContinue(true);
       return;
     }
+    const leaderDegree = (members[0]?.degree?.trim() as any) || degree;
+    if (leaderDegree && leaderDegree !== degree) {
+      setDegree(leaderDegree);
+    }
     next();
   };
 
@@ -316,7 +202,7 @@ export function StepMembers() {
     <div className="max-w-2xl mx-auto">
       <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">ASSEMBLE THE CREW.</h2>
       <p className="text-sm md:text-base text-[#A8A8A8] mb-8 md:mb-10">
-        Minimum 3, maximum 4. Each member must have a unique email. The first member is always the team leader.
+        Minimum 3, maximum 4. Each member must have a unique email and select their degree category. The first member is always the team leader.
       </p>
 
       <div className="space-y-4 md:space-y-6">
@@ -435,7 +321,20 @@ export function StepMembers() {
                 <div className="md:col-span-2">
                   <DegreeField
                     value={m.degree}
-                    onChange={(v) => setMember(i, { degree: v })}
+                    readOnly={!isLeader}
+                    subtitle="Auto-synced with Leader (Read-only)"
+                    onChange={(v) => {
+                      setMember(i, { degree: v });
+                      if (isLeader) {
+                        setDegree(v as any);
+                        // Team lead degree is final for all: auto-select for all members
+                        members.forEach((_, idx) => {
+                          if (idx !== 0) {
+                            setMember(idx, { degree: v });
+                          }
+                        });
+                      }
+                    }}
                     error={degreeError}
                   />
                 </div>
@@ -538,18 +437,133 @@ export function StepMembers() {
   );
 }
 
-// ─── STEP 2: DETAILS REVIEW ───────────────────────────────────────────────────
+// ─── STEP 2: DOMAIN & BRIEF ───────────────────────────────────────────────────
 
 export function StepDetails() {
-  const { teamName, degree, domainName, members, next, prev } = useRegisterStore();
+  const {
+    teamName,
+    degree,
+    domainId,
+    domainName,
+    setDomain,
+    members,
+    next,
+    prev,
+  } = useRegisterStore();
+
+  const [attemptedContinue, setAttemptedContinue] = useState(false);
+
+  // Degree-based domain filtering
+  const { data: domainsData, isLoading: domainsLoading } = useQuery<{
+    domains: Array<{ id: string; name: string; degrees: string[] }>;
+  }>({
+    queryKey: ["domains-for-degree", degree],
+    queryFn: async () => {
+      if (!degree) return { domains: [] };
+      const r = await fetch(`/api/domains?degree=${encodeURIComponent(degree)}`);
+      if (!r.ok) return { domains: [] };
+      return r.json();
+    },
+    enabled: Boolean(degree),
+  });
+
+  const availableDomains = domainsData?.domains || [];
+
+  // Reset selected domain if no longer valid for selected degree
+  useEffect(() => {
+    if (domainId && availableDomains.length > 0) {
+      const match = availableDomains.find((d) => d.id === domainId);
+      if (!match) {
+        setDomain("", "");
+      }
+    }
+  }, [domainId, availableDomains, setDomain]);
+
+  const hasDomains = availableDomains.length > 0;
+  const domainSelected = !hasDomains || Boolean(domainId);
+  const canProceed = !domainsLoading && domainSelected;
+
+  const handleProceed = () => {
+    if (!canProceed) {
+      setAttemptedContinue(true);
+      return;
+    }
+    next();
+  };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">CONFIRM THE BRIEF.</h2>
-      <p className="text-sm md:text-base text-[#A8A8A8] mb-8 md:mb-10">
-        Review your team details before proceeding to payment.
-      </p>
+    <div className="max-w-2xl mx-auto space-y-8">
+      <div>
+        <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">CHOOSE YOUR DOMAIN.</h2>
+        <p className="text-sm md:text-base text-[#A8A8A8]">
+          Select your competition domain based on your category ({degree || "selected category"}) and confirm your team details.
+        </p>
+      </div>
 
+      {/* Domain Selection Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">
+              Competition Domain {hasDomains && <span className="text-[#D83A43]">*</span>}
+            </span>
+            {hasDomains && !domainId && (
+              <span className="text-xs text-[#D83A43]">· Required</span>
+            )}
+          </div>
+          {degree && (
+            <span className="mono text-xs px-2.5 py-0.5 rounded bg-[#B52A32]/20 border border-[#B52A32]/40 text-[#D83A43] font-semibold">
+              Category: {degree}
+            </span>
+          )}
+        </div>
+
+        {domainsLoading ? (
+          <div className="p-6 rounded-xl border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
+            Loading available domains for {degree}…
+          </div>
+        ) : availableDomains.length === 0 ? (
+          <div className="p-6 rounded-xl border border-white/10 bg-[#080808] text-center text-xs text-[#A8A8A8]">
+            No specialized domains configured for {degree}. All teams participate in the general track.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {availableDomains.map((dom) => {
+              const isSelected = domainId === dom.id;
+              return (
+                <button
+                  type="button"
+                  key={dom.id}
+                  onClick={() => {
+                    setDomain(dom.id, dom.name);
+                    setAttemptedContinue(false);
+                  }}
+                  className={`p-4 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-md shadow-[#B52A32]/10"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/25 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-white truncate">{dom.name}</div>
+                    <div className="text-[10px] text-[#A8A8A8] mt-1 mono">Eligible track: {degree}</div>
+                  </div>
+                  {isSelected && <Check size={18} className="text-[#D83A43] shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {hasDomains && !domainId && attemptedContinue && (
+          <div className="p-3.5 rounded-lg bg-[#B52A32]/10 border border-[#B52A32]/30 text-xs text-[#D83A43] flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>Please select a competition domain before continuing to payment.</span>
+          </div>
+        )}
+      </div>
+
+      {/* Team Brief Review Card */}
       <div className="glass rounded-lg p-5 md:p-8">
         <div className="pb-4 md:pb-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -559,12 +573,20 @@ export function StepDetails() {
           <div className="flex flex-wrap items-center gap-2">
             {degree && (
               <span className="mono text-xs px-2.5 py-1 rounded bg-[#B52A32]/20 border border-[#B52A32]/40 text-white font-semibold">
-                Degree: {degree}
+                Category: {degree}
               </span>
             )}
-            {domainName && (
-              <span className="mono text-xs px-2.5 py-1 rounded bg-white/10 border border-white/10 text-white font-semibold">
+            {domainName ? (
+              <span className="mono text-xs px-2.5 py-1 rounded bg-[#B52A32]/10 border border-[#B52A32]/30 text-[#D83A43] font-semibold">
                 Domain: {domainName}
+              </span>
+            ) : hasDomains ? (
+              <span className="mono text-xs px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold">
+                Domain: Not selected
+              </span>
+            ) : (
+              <span className="mono text-xs px-2.5 py-1 rounded bg-white/10 border border-white/10 text-white font-semibold">
+                General Track
               </span>
             )}
           </div>
@@ -603,8 +625,9 @@ export function StepDetails() {
           <ArrowLeft size={14} /> Back
         </button>
         <button
-          onClick={next}
-          className="group flex items-center gap-2 rounded-full bg-[#B52A32] px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#D83A43] min-h-[44px]"
+          disabled={!canProceed}
+          onClick={handleProceed}
+          className="group flex items-center gap-2 rounded-full bg-[#B52A32] disabled:opacity-30 disabled:cursor-not-allowed px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#D83A43] min-h-[44px]"
         >
           PROCEED TO PAYMENT <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
         </button>
@@ -615,7 +638,6 @@ export function StepDetails() {
 
 // ─── STEP 3: PAYMENT ─────────────────────────────────────────────────────────
 
-const REGISTRATION_FEE = "₹1,000";
 const OFFICIAL_UPI_ID = "9364008472@kotak";
 const PAYMENT_QR = "/api/payment-qr";
 
@@ -629,7 +651,7 @@ export function StepPayment() {
     setServerError, setSubmitting,
   } = useRegisterStore();
 
-  const fee = REGISTRATION_FEE;
+  const fee = degree === "Diploma" ? "₹500" : "₹1,000";
 
   // Query degree-specific payment QR info
   const { data: qrInfo, isLoading: qrLoading } = useQuery<{
@@ -1083,27 +1105,45 @@ function DegreeField({
   value,
   onChange,
   error,
+  readOnly,
+  subtitle,
 }: {
   value: string;
   onChange: (v: string) => void;
   error?: string;
+  readOnly?: boolean;
+  subtitle?: string;
 }) {
   return (
     <div>
       <label className="block">
-        <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Degree</span>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="mt-1 w-full bg-transparent border-b border-white/15 py-2 text-base text-white focus:border-[#B52A32] focus:outline-none transition-colors appearance-none cursor-pointer"
-        >
-          <option value="" disabled className="bg-[#080808] text-[#A8A8A8]">Select degree</option>
-          {DEGREE_OPTIONS.map((opt) => (
-            <option key={opt} value={opt} className="bg-[#080808] text-white">
-              {opt}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center justify-between">
+          <span className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">Degree</span>
+          {readOnly && (
+            <span className="mono text-[10px] text-[#D83A43] uppercase tracking-wider font-semibold">
+              {subtitle || "Auto-selected with Leader (Read-only)"}
+            </span>
+          )}
+        </div>
+        {readOnly ? (
+          <div className="mt-1 w-full bg-[#080808]/60 border-b border-white/10 py-2 text-base text-white/90 flex items-center justify-between cursor-not-allowed select-none">
+            <span className="font-medium text-white">{value || "Awaiting Leader's selection"}</span>
+            <span className="text-[11px] text-[#A8A8A8] mono">Fixed for all members</span>
+          </div>
+        ) : (
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-1 w-full bg-transparent border-b border-white/15 py-2 text-base text-white focus:border-[#B52A32] focus:outline-none transition-colors appearance-none cursor-pointer"
+          >
+            <option value="" disabled className="bg-[#080808] text-[#A8A8A8]">Select degree (UG, PG, Diploma)</option>
+            {DEGREE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt} className="bg-[#080808] text-white">
+                {opt}
+              </option>
+            ))}
+          </select>
+        )}
       </label>
       {error && <div className="mt-1 text-xs text-[#D83A43]">{error}</div>}
     </div>
