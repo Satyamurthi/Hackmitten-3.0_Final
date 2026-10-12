@@ -34,7 +34,6 @@ export async function GET() {
         mimeType: "image/png",
         sizeBytes: 0,
         upiId: "9364008472@kotak",
-        isActive: true,
         createdAt: new Date("2026-01-01"),
         updatedAt: new Date(),
         url: "/api/payment-qr",

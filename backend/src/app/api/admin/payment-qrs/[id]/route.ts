@@ -29,7 +29,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
             mimeType: "image/png",
             sizeBytes: 0,
             upiId: "9364008472@kotak",
-            isActive: true,
           },
         });
       } else {
@@ -41,7 +40,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     let degrees: string[] | undefined = undefined;
     let label: string | null | undefined = undefined;
     let upiId: string | null | undefined = undefined;
-    let isActive: boolean | undefined = undefined;
     let newFile: File | null = null;
 
     if (contentType.includes("multipart/form-data")) {
@@ -61,10 +59,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       if (formData.has("upiId")) {
         upiId = (formData.get("upiId") as string)?.trim() || null;
       }
-      if (formData.has("isActive")) {
-        const val = formData.get("isActive");
-        isActive = val === "true" || val === "1" || val === true;
-      }
 
       const fileEntry = formData.get("file");
       if (fileEntry instanceof File && fileEntry.size > 0) {
@@ -75,7 +69,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       if (body.degrees !== undefined) degrees = body.degrees;
       if (body.label !== undefined) label = body.label ? String(body.label).trim() : null;
       if (body.upiId !== undefined) upiId = body.upiId ? String(body.upiId).trim() : null;
-      if (body.isActive !== undefined) isActive = Boolean(body.isActive);
     }
 
     const dataToUpdate: Record<string, unknown> = {};
@@ -96,7 +89,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     if (label !== undefined) dataToUpdate.label = label;
     if (upiId !== undefined) dataToUpdate.upiId = upiId;
-    if (isActive !== undefined) dataToUpdate.isActive = isActive;
 
     if (newFile) {
       try {

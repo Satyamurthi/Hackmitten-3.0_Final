@@ -15,7 +15,6 @@ export async function GET(req: Request) {
       const qrRecord = await db.paymentQrCode.findFirst({
         where: {
           degrees: { has: degree },
-          isActive: true,
         },
         orderBy: { updatedAt: "desc" },
       });
@@ -50,7 +49,6 @@ export async function GET(req: Request) {
 
     // Default / legacy fallback when no specific degree is requested
     const latestQr = await db.paymentQrCode.findFirst({
-      where: { isActive: true },
       orderBy: { updatedAt: "desc" },
     });
     if (latestQr && latestQr.filePath) {

@@ -119,7 +119,7 @@ export async function POST(req: Request) {
 
     const degree = parsed.data.degree ?? null;
     const domainId = parsed.data.domainId ?? null;
-    let domainRecord: { id: string; name: string; degrees: string[] } | null = null;
+    let domainRecord: { id: string; name: string; degrees: string[]; enabled: boolean } | null = null;
     if (domainId) {
       domainRecord = await db.domain.findUnique({ where: { id: domainId } });
       if (!domainRecord || !domainRecord.enabled) {
