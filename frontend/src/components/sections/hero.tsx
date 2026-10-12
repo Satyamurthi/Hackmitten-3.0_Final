@@ -31,7 +31,56 @@ export function Hero() {
     >
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#030303] pointer-events-none" />
 
-      <div className="hero-content-depth relative z-10 flex flex-col items-center w-full max-w-4xl">
+      {/* Side College Logos: Left (MITT) & Right (10 Years of Excellence) */}
+      <div className="pointer-events-none absolute inset-x-0 top-14 sm:top-16 md:top-18 z-20 px-4 sm:px-8 md:px-12 lg:px-16 flex items-center justify-between">
+        <div className="pointer-events-auto">
+          <a
+            href="https://mitt.edu.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block transition-transform duration-200 hover:scale-105 focus:outline-none"
+            aria-label="Maharaja Institute of Technology Thandavapura website"
+          >
+            <img
+              src="/images/college_logo/MITT_LOGO.jpeg"
+              alt="MITT Logo"
+              className="h-14 w-14 sm:h-[72px] sm:w-[72px] md:h-[88px] md:w-[88px] lg:h-[104px] lg:w-[104px] rounded-full object-contain ring-1 ring-white/20 bg-white/5 p-1 backdrop-blur-sm shadow-[0_0_28px_rgba(255,255,255,0.09)]"
+            />
+          </a>
+        </div>
+        <div className="pointer-events-auto">
+          <a
+            href="https://mitt.edu.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block transition-transform duration-200 hover:scale-105 focus:outline-none"
+            aria-label="Maharaja Institute of Technology Thandavapura 10 Years of Excellence"
+          >
+            <img
+              src="/images/college_logo/Ten_Year_Excellence.jpeg"
+              alt="10 Years of Excellence"
+              className="h-14 w-14 sm:h-[72px] sm:w-[72px] md:h-[88px] md:w-[88px] lg:h-[104px] lg:w-[104px] rounded-full object-contain ring-1 ring-white/20 bg-black/40 p-1 backdrop-blur-sm shadow-[0_0_28px_rgba(216,58,67,0.19)]"
+            />
+          </a>
+        </div>
+      </div>
+
+      <div className="hero-content-depth relative z-10 flex flex-col items-center w-full max-w-5xl">
+        {/* College Name directly above 24 Hours */}
+        <div className="hero-reveal hero-reveal-delay-1 mb-2 md:mb-3 text-center px-4 max-w-5xl">
+          <a
+            href="https://mitt.edu.in/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group inline-block focus:outline-none"
+            aria-label="Maharaja Institute of Technology Thandavapura website"
+          >
+            <p className="display text-sm sm:text-lg md:text-2xl lg:text-[1.85rem] font-bold uppercase tracking-tight text-white/90 group-hover:text-white group-hover:text-glow-red transition-all duration-200 leading-[1.15] cursor-pointer">
+              Maharaja Institute of Technology Thandavapura
+            </p>
+          </a>
+        </div>
+
         <div className="hero-reveal hero-reveal-delay-1 mb-6 flex items-center gap-3 flex-wrap justify-center">
           <span className="h-px w-8 md:w-10 bg-[#B52A32]" />
           <span className="mono text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#A8A8A8] text-center">
