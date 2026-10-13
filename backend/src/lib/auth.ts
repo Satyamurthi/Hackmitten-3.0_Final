@@ -107,11 +107,12 @@ export const authOptions: NextAuthOptions = {
           });
 
           // 2. Look up Leader Participant record
-          const leader = await db.participant.findFirst({
+          let leader = await db.participant.findFirst({
             where: {
               OR: [
                 { email: user?.email || email },
                 { email: email },
+                { team: { loginUsername: { equals: id, mode: "insensitive" } } },
               ],
               isLeader: true,
             },
@@ -121,8 +122,28 @@ export const authOptions: NextAuthOptions = {
             orderBy: { createdAt: "desc" },
           });
 
+          if (!leader) {
+            const teamWithUser = await db.team.findFirst({
+              where: {
+                OR: [
+                  { loginUsername: { equals: id, mode: "insensitive" } },
+                  { registrationId: { equals: id, mode: "insensitive" } },
+                ],
+              },
+              include: {
+                members: { orderBy: { isLeader: "desc" } },
+              },
+            });
+            if (teamWithUser && teamWithUser.members.length > 0) {
+              leader = {
+                ...teamWithUser.members[0],
+                team: teamWithUser,
+              } as any;
+            }
+          }
+
           if (!leader || !leader.team) {
-            console.warn("[auth] participant login: leader not found for identifier:", email);
+            console.warn("[auth] participant login: leader not found for identifier:", id);
             return null;
           }
 

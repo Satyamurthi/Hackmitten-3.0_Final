@@ -4,8 +4,9 @@ import { requirePermission, jsonError } from "@/lib/api-auth";
 import { z } from "zod";
 import { deletePrivateFile, storeParticipantImage, storePaymentScreenshot } from "@/lib/upload";
 import { ADMIN_TEAM_SELECT } from "@/lib/admin-team-view";
-import { sendParticipantUpdateEmail, ParticipantUpdateChange, sendEmail, approvalEmailHtml, approvalEmailText } from "@/lib/email";
+import { sendParticipantUpdateEmail, ParticipantUpdateChange, sendEmail, approvalEmailHtml, approvalEmailText, sendCredentialsEmailToTeam } from "@/lib/email";
 import { GMAIL_REGEX } from "@/lib/validators";
+import bcrypt from "bcryptjs";
 import {
   generateQrToken,
   generateRegistrationId,
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
     if (!team) return NextResponse.json({ error: "Team not found" }, { status: 404 });
 
-    // Update team name + college + status + degree + domain
+    // Update team name + college + status + degree + domain + credentials
     const updateData: {
       teamName?: string;
       college?: string | null;
@@ -102,7 +103,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       degree?: string | null;
       domainId?: string | null;
       domainName?: string | null;
+      participantPassword?: string | null;
+      loginUsername?: string | null;
     } = {};
+
+    const assignedPassword = (
+      typeof body.participantPassword === "string" && body.participantPassword.trim()
+        ? body.participantPassword.trim()
+        : typeof body.password === "string" && body.password.trim()
+        ? body.password.trim()
+        : undefined
+    );
+    if (assignedPassword !== undefined) {
+      updateData.participantPassword = assignedPassword;
+    }
+
+    const assignedUsername = (
+      typeof body.loginUsername === "string" && body.loginUsername.trim()
+        ? body.loginUsername.trim().toLowerCase()
+        : typeof body.username === "string" && body.username.trim()
+        ? body.username.trim().toLowerCase()
+        : undefined
+    );
+    if (assignedUsername !== undefined) {
+      updateData.loginUsername = assignedUsername;
+    }
     if (body.teamName && body.teamName.trim() !== team.teamName) {
       const norm = normalizeTeamName(body.teamName);
       const matches = await db.$queryRaw<Array<{ id: string }>>`
@@ -455,6 +480,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           },
         });
       }
+
+      // 6. Sync User credentials if password or username was modified
+      const currentLeader = parsedMembers?.find((m: any) => m.isLeader) || team.members.find((m) => m.isLeader) || team.members[0];
+      const targetLeaderEmail = currentLeader?.email?.toLowerCase().trim();
+      if (targetLeaderEmail && (assignedPassword !== undefined || assignedUsername !== undefined)) {
+        const passwordToHash = assignedPassword || team.participantPassword || team.registrationId || team.id;
+        const passwordHash = await bcrypt.hash(passwordToHash, 10);
+        const finalUsername = assignedUsername || updateData.loginUsername || team.loginUsername || targetLeaderEmail;
+
+        await tx.user.upsert({
+          where: { email: targetLeaderEmail },
+          update: {
+            username: finalUsername,
+            name: currentLeader.fullName,
+            role: "PARTICIPANT",
+            passwordHash,
+          },
+          create: {
+            email: targetLeaderEmail,
+            username: finalUsername,
+            name: currentLeader.fullName,
+            role: "PARTICIPANT",
+            passwordHash,
+          },
+        });
+      }
     });
 
     // Cleanup replaced files
@@ -507,6 +558,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           });
         }
       }
+    }
+
+    // Send credentials update email if requested or explicitly triggered
+    if (body.sendCredentialsEmail === true || (assignedPassword !== undefined && body.sendCredentialsEmail !== false)) {
+      const currentLeader = parsedMembers?.find((m: any) => m.isLeader) || team.members.find((m) => m.isLeader) || team.members[0];
+      const finalUsername = assignedUsername || updateData.loginUsername || team.loginUsername || currentLeader?.email || "";
+      const finalPassword = assignedPassword || updateData.participantPassword || team.participantPassword || team.registrationId || team.id;
+
+      sendCredentialsEmailToTeam({
+        teamId: id,
+        teamName: effectiveTeamName,
+        username: finalUsername,
+        password: finalPassword,
+      }).catch((err) => {
+        console.error("[admin/teams/[id]] Failed to send credentials email on edit:", err);
+      });
     }
 
     const updated = await db.team.findUniqueOrThrow({ where: { id }, select: ADMIN_TEAM_SELECT });

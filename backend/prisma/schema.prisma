@@ -49,6 +49,7 @@ model EventConfig {
   id                           String   @id @default("singleton")
   registrationEnabled          Boolean  @default(true)
   registrationLimit            Int?
+  diplomaRegistrationLimit     Int?
   eventStartDate               String?
   eventStartTime               String?
   problemStatementsReleaseTime String?
@@ -110,6 +111,7 @@ model Team {
   approvalEmailSentAt                     DateTime?
   rejectionEmailSentAt                    DateTime?
   participantPassword                     String?
+  loginUsername                           String?
   acceptedProblemStatementId             String?
   acceptedProblemStatement               ProblemStatement?  @relation("TeamAcceptedProblemStatement", fields: [acceptedProblemStatementId], references: [id], onDelete: SetNull)
   createdAt                               DateTime           @default(now())

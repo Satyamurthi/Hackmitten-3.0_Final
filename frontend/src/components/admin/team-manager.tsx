@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck, ExternalLink, CheckCircle2, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck, ExternalLink, CheckCircle2, RotateCcw, Download, Key } from "lucide-react";
 import { fetchJson } from "@/lib/api-fetch";
 import { compressImage } from "@/lib/image-compress";
 
@@ -15,6 +15,10 @@ type Team = {
   degree?: string | null;
   domainId?: string | null;
   domainName?: string | null;
+  loginUsername?: string | null;
+  participantPassword?: string | null;
+  acceptedProblemStatementId?: string | null;
+  acceptedProblemStatement?: { id: string; title: string } | null;
   createdAt: string;
   members: {
     id: string;
@@ -40,6 +44,7 @@ type Team = {
 export function TeamManager() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [degreeFilter, setDegreeFilter] = useState<"ALL" | "Diploma" | "UG" | "PG">("ALL");
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Team | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Team | null>(null);
@@ -51,11 +56,79 @@ export function TeamManager() {
     queryFn: () => fetchJson("/api/admin/teams"),
   });
   const teams: Team[] = data?.teams ?? [];
+
   const filtered = teams.filter((t) => {
+    if (degreeFilter !== "ALL" && t.degree !== degreeFilter) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return t.teamName.toLowerCase().includes(q) || t.registrationId?.toLowerCase().includes(q) || t.college?.toLowerCase().includes(q);
+    return (
+      t.teamName.toLowerCase().includes(q) ||
+      t.registrationId?.toLowerCase().includes(q) ||
+      t.college?.toLowerCase().includes(q) ||
+      t.loginUsername?.toLowerCase().includes(q) ||
+      t.members?.some((m) => m.fullName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+    );
   });
+
+  const exportTeamsCsv = () => {
+    if (filtered.length === 0) return;
+    const headers = [
+      "Registration ID",
+      "Team Name",
+      "Degree Category",
+      "Domain",
+      "Status",
+      "Leader Name",
+      "Leader Email",
+      "Leader Phone",
+      "College",
+      "Total Members",
+      "Login Username",
+      "Password",
+      "Accepted Problem Statement",
+      "Registration Date",
+    ];
+
+    const escapeCsv = (val: any) => {
+      const str = String(val ?? "");
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = filtered.map((t) => {
+      const leader = t.members?.find((m) => m.isLeader) || t.members?.[0];
+      return [
+        escapeCsv(t.registrationId || t.id),
+        escapeCsv(t.teamName),
+        escapeCsv(t.degree || "—"),
+        escapeCsv(t.domainName || "—"),
+        escapeCsv(t.status),
+        escapeCsv(leader?.fullName || "—"),
+        escapeCsv(leader?.email || "—"),
+        escapeCsv(leader?.phone || "—"),
+        escapeCsv(t.college || leader?.college || "—"),
+        escapeCsv(t.members?.length || 0),
+        escapeCsv(t.loginUsername || leader?.email || "—"),
+        escapeCsv(t.participantPassword || t.registrationId || t.id),
+        escapeCsv(t.acceptedProblemStatement?.title || "None"),
+        escapeCsv(new Date(t.createdAt).toLocaleDateString()),
+      ].join(",");
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const filterSuffix = degreeFilter !== "ALL" ? `_${degreeFilter}` : "";
+    link.setAttribute("download", `hackmitten_teams${filterSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const deleteTeam = async () => {
     if (!confirmDelete) return;
@@ -80,65 +153,131 @@ export function TeamManager() {
           <h1 className="display text-2xl md:text-3xl font-bold text-white">Team Management</h1>
           <p className="text-sm text-[#A8A8A8] mt-1">{teams.length} teams · add, edit, or delete</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 rounded-full bg-[#B52A32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#D83A43] min-h-[44px]"
-        >
-          <Plus size={14} /> Add Team
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportTeamsCsv}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-all disabled:opacity-40"
+            title={`Export ${filtered.length} teams as CSV`}
+          >
+            <Download size={14} /> Export CSV {degreeFilter !== "ALL" ? `(${degreeFilter})` : ""}
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 rounded-full bg-[#B52A32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#D83A43] min-h-[44px]"
+          >
+            <Plus size={14} /> Add Team
+          </button>
+        </div>
       </header>
 
       {(error || queryError) && <div role="alert" className="glass rounded p-3 text-sm text-[#D83A43] border-l-2 border-[#B52A32]">{error || queryError?.message}</div>}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A8A8A8]" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search team name, ID, or college…"
-          className="w-full bg-[#080808] border border-white/10 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder:text-[#A8A8A8]/50 focus:border-[#B52A32] focus:outline-none"
-        />
+      {/* Degree Filters & Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#080808] border border-white/5 rounded-xl p-3">
+        {/* Category Pills */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(["ALL", "Diploma", "UG", "PG"] as const).map((deg) => {
+            const count = deg === "ALL" ? teams.length : teams.filter((t) => t.degree === deg).length;
+            const active = degreeFilter === deg;
+            return (
+              <button
+                key={deg}
+                onClick={() => setDegreeFilter(deg)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  active
+                    ? "bg-[#B52A32] text-white shadow-md shadow-[#B52A32]/20"
+                    : "bg-white/5 text-[#A8A8A8] hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <span>{deg === "ALL" ? "All Categories" : deg}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] mono ${
+                  active ? "bg-black/30 text-white" : "bg-white/10 text-[#777]"
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full md:w-80">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A8A8A8]" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search team name, ID, member, username…"
+            className="w-full bg-[#121212] border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-[#A8A8A8]/50 focus:border-[#B52A32] focus:outline-none"
+          />
+        </div>
       </div>
 
       {isLoading ? (
         <div className="text-[#A8A8A8] text-sm">Loading…</div>
       ) : filtered.length === 0 ? (
         <div className="glass rounded-lg p-8 text-center">
-          <div className="text-sm text-[#A8A8A8]">No teams found.</div>
+          <div className="text-sm text-[#A8A8A8]">No teams found matching active filter.</div>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((team) => (
-            <div key={team.id} className="glass rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="mono text-xs text-[#B52A32]">{team.registrationId ?? "—"}</div>
-                  <div className="display text-lg font-bold text-white mt-1">{team.teamName}</div>
+            <div key={team.id} className="glass rounded-lg p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="mono text-xs text-[#B52A32]">{team.registrationId ?? "—"}</div>
+                    <div className="display text-lg font-bold text-white mt-1">{team.teamName}</div>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-1 rounded ${
+                    team.status === "APPROVED" ? "bg-[#B52A32]/20 text-[#D83A43]" :
+                    team.status === "REJECTED" ? "bg-red-500/20 text-red-400" :
+                    "bg-white/5 text-[#A8A8A8]"
+                  }`}>
+                    {team.status.replace(/_/g, " ")}
+                  </span>
                 </div>
-                <span className={`text-[10px] font-semibold px-2 py-1 rounded ${
-                  team.status === "APPROVED" ? "bg-[#B52A32]/20 text-[#D83A43]" :
-                  team.status === "REJECTED" ? "bg-red-500/20 text-red-400" :
-                  "bg-white/5 text-[#A8A8A8]"
-                }`}>
-                  {team.status.replace(/_/g, " ")}
-                </span>
+                {team.college && <div className="text-xs text-[#A8A8A8] truncate">{team.college}</div>}
+
+                {/* Category & Domain */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {team.degree && (
+                    <span className="mono text-[10px] bg-[#B52A32]/20 border border-[#B52A32]/40 text-white px-2 py-0.5 rounded font-semibold">
+                      {team.degree}
+                    </span>
+                  )}
+                  {team.domainName && (
+                    <span className="mono text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-medium">
+                      {team.domainName}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-[#A8A8A8] ml-auto">{team.members.length} members</span>
+                </div>
+
+                {/* Login Credentials and Accepted Problem Statement */}
+                <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1 text-xs">
+                  <div className="flex items-center justify-between text-[#888]">
+                    <span>Username:</span>
+                    <span className="mono text-white text-[11px] truncate max-w-[170px]" title={team.loginUsername || team.members.find((m) => m.isLeader)?.email || "—"}>
+                      {team.loginUsername || team.members.find((m) => m.isLeader)?.email || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[#888]">
+                    <span>Password:</span>
+                    <span className="mono text-emerald-400 font-semibold text-[11px]">
+                      {team.participantPassword || team.registrationId || team.id}
+                    </span>
+                  </div>
+                  {team.acceptedProblemStatement && (
+                    <div className="pt-1 flex items-start gap-1 text-[11px] text-purple-300">
+                      <span className="shrink-0 text-[#888]">Problem:</span>
+                      <span className="truncate">{team.acceptedProblemStatement.title}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              {team.college && <div className="text-xs text-[#A8A8A8] truncate">{team.college}</div>}
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                {team.degree && (
-                  <span className="mono text-[10px] bg-[#B52A32]/20 border border-[#B52A32]/40 text-white px-2 py-0.5 rounded font-semibold">
-                    {team.degree}
-                  </span>
-                )}
-                {team.domainName && (
-                  <span className="mono text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-medium">
-                    {team.domainName}
-                  </span>
-                )}
-                <span className="text-[11px] text-[#A8A8A8] ml-auto">{team.members.length} members</span>
-              </div>
+
               <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
                 <button
                   onClick={() => setEditing(team)}
@@ -296,6 +435,24 @@ function TeamFormModal({
   const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
   const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
 
+  const [loginUsername, setLoginUsername] = useState(
+    team?.loginUsername ?? team?.members?.find((m) => m.isLeader)?.email ?? ""
+  );
+  const [participantPassword, setParticipantPassword] = useState(
+    team?.participantPassword ?? ""
+  );
+  const [showPassword, setShowPassword] = useState(false);
+  const [sendCredentialsEmail, setSendCredentialsEmail] = useState(true);
+
+  const generatePassword = () => {
+    const leaderMember = members.find((m) => m.isLeader) || members[0];
+    const leaderName = leaderMember?.fullName || teamName || "hack";
+    const clean = leaderName.replace(/[^a-zA-Z]/g, "").toLowerCase();
+    const prefix = (clean.slice(0, 4) || "team").padEnd(4, "x");
+    const digits = Math.floor(1000 + Math.random() * 9000);
+    setParticipantPassword(`${prefix}${digits}`);
+  };
+
   // Fetch full live team record in edit mode to guarantee member images and screenshots are loaded
   const { data: teamDetailData } = useQuery<{ team: Team }>({
     queryKey: ["admin-team-detail", team?.id],
@@ -328,6 +485,12 @@ function TeamFormModal({
       );
       if (teamDetailData.team.payment?.transactionId && !transactionId) {
         setTransactionId(teamDetailData.team.payment.transactionId);
+      }
+      if (teamDetailData.team.loginUsername && !loginUsername) {
+        setLoginUsername(teamDetailData.team.loginUsername);
+      }
+      if (teamDetailData.team.participantPassword && !participantPassword) {
+        setParticipantPassword(teamDetailData.team.participantPassword);
       }
     }
   }, [teamDetailData]);
@@ -451,6 +614,9 @@ function TeamFormModal({
           status,
           transactionId: transactionId.trim() || undefined,
           paymentStatus: status === "APPROVED" ? "VERIFIED" : paymentStatus,
+          loginUsername: loginUsername.trim() || undefined,
+          participantPassword: participantPassword.trim() || undefined,
+          sendCredentialsEmail,
         })
       );
 
@@ -667,6 +833,85 @@ function TeamFormModal({
                   <span>Immediate pass generation: All crew members will be issued digital pass credentials with food QR tokens and sent pass emails.</span>
                 </div>
               )}
+            </div>
+
+            {/* Credentials Section */}
+            <div className="pt-3 border-t border-white/5 space-y-3">
+              <div className="mono text-[11px] uppercase tracking-wider text-white font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Key size={13} className="text-[#B52A32]" />
+                  Participant Login Credentials
+                </span>
+                <button
+                  type="button"
+                  onClick={generatePassword}
+                  className="text-[11px] text-[#B52A32] hover:text-[#D83A43] underline font-sans normal-case"
+                >
+                  Generate Simple Password
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block">
+                    <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                      Login Username / Email
+                    </span>
+                    <input
+                      type="text"
+                      value={loginUsername}
+                      onChange={(e) => setLoginUsername(e.target.value)}
+                      placeholder={members.find((m) => m.isLeader)?.email || "Leader's email or custom username"}
+                      className="mt-1 w-full bg-[#080808] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none"
+                    />
+                  </label>
+                  <p className="text-[11px] text-[#777] mt-1">
+                    Defaults to leader email. Teams can log in using this username or leader email.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block">
+                    <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                      Login Password
+                    </span>
+                    <div className="relative mt-1">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={participantPassword}
+                        onChange={(e) => setParticipantPassword(e.target.value)}
+                        placeholder="e.g. sach4829 or Team ID"
+                        className="w-full bg-[#080808] border border-white/10 rounded-lg pl-3 pr-14 py-2 text-sm text-white font-mono focus:border-[#B52A32] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888] hover:text-white text-xs"
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                  </label>
+                  <p className="text-[11px] text-[#777] mt-1">
+                    Format: 4 letters of leader name + 4 digits (e.g. sach4829).
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={sendCredentialsEmail}
+                  onChange={(e) => setSendCredentialsEmail(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#B52A32] focus:ring-0 bg-transparent border-white/30"
+                />
+                <div>
+                  <span className="text-xs text-white font-medium">Send credentials email to team members</span>
+                  <p className="text-[11px] text-[#888]">
+                    Dispatches an email with username, password, team name, and portal login link to all team members.
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
 

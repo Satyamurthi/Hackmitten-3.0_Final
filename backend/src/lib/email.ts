@@ -813,4 +813,123 @@ export async function sendNewTeamAdminAlertEmail(data: NewTeamAlertPayload): Pro
   });
 }
 
+export function credentialsUpdateEmailHtml(opts: {
+  leaderName: string;
+  teamName: string;
+  username: string;
+  password?: string | null;
+  registrationId?: string | null;
+}): string {
+  const leaderName = escapeHtml(opts.leaderName);
+  const teamName = escapeHtml(opts.teamName);
+  const username = escapeHtml(opts.username);
+  const password = opts.password ? escapeHtml(opts.password) : null;
+  const registrationId = opts.registrationId ? escapeHtml(opts.registrationId) : null;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#030303;font-family:'Inter',Arial,sans-serif;color:#F2F2F2;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030303;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#080808;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:40px 40px 20px;text-align:center;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#B52A32;">HACKMITTEN 3.0</div>
+              <h1 style="font-size:28px;font-weight:700;color:#F2F2F2;margin:16px 0 8px;">LOGIN CREDENTIALS UPDATED</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 40px;color:#A8A8A8;font-size:14px;line-height:1.7;">
+              <p style="margin:0 0 20px;color:#F2F2F2;">Hello ${leaderName},</p>
+              <p style="margin:0 0 20px;">Your team login credentials for Hackmitten 3.0 have been updated by the event administrator.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#151515;border-radius:8px;margin-bottom:20px;">
+                <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;">TEAM</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;">${teamName}</td></tr>
+                ${registrationId ? `<tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">REGISTRATION ID</td><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:14px;color:#FFFFFF;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${registrationId}</td></tr>` : ""}
+              </table>
+
+              <!-- Credentials Card -->
+              <div style="background:#151515;border:1px solid rgba(216,58,67,0.3);border-radius:10px;padding:20px;margin:24px 0;">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#D83A43;font-weight:700;">
+                  YOUR NEW PARTICIPANT LOGIN CREDENTIALS
+                </div>
+                <p style="font-size:12px;color:#A8A8A8;margin:6px 0 14px;">
+                  Please use these updated details to log in to your participant dashboard.
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                  <tr>
+                    <td style="padding:10px 14px;color:#888888;font-size:12px;width:130px;">Username (Email):</td>
+                    <td style="padding:10px 14px;color:#FFFFFF;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;">${username}</td>
+                  </tr>
+                  ${password ? `<tr>
+                    <td style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);color:#888888;font-size:12px;">Login Password:</td>
+                    <td style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);color:#D83A43;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;">${password}</td>
+                  </tr>` : ""}
+                </table>
+                <div style="margin-top:16px;text-align:center;">
+                  <a href="https://hackmitten-3-0.mitt.edu.in/login?role=PARTICIPANT" style="display:inline-block;background:#B52A32;color:#FFFFFF;font-size:12px;font-weight:600;padding:10px 24px;border-radius:20px;text-decoration:none;">
+                    Sign In to Participant Dashboard
+                  </a>
+                </div>
+              </div>
+
+              <p style="margin:20px 0 0;font-size:12px;color:#888888;">
+                If you did not request this update or need assistance, please contact the hackathon coordinators immediately.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#666666;letter-spacing:1px;">
+              HACKMITTEN 3.0 · MAHARAJA INSTITUTE OF TECHNOLOGY THANDAVAPURA
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export async function sendCredentialsEmailToTeam(opts: {
+  teamName: string;
+  leaderName: string;
+  username: string;
+  password?: string | null;
+  recipientEmails: string[];
+  registrationId?: string | null;
+}): Promise<EmailResult[]> {
+  const uniqueEmails = Array.from(
+    new Set(
+      opts.recipientEmails
+        .map((e) => e?.trim().toLowerCase())
+        .filter((e) => e && e.includes("@"))
+    )
+  );
+
+  const results: EmailResult[] = [];
+  for (const to of uniqueEmails) {
+    const res = await sendEmail({
+      to,
+      subject: `🔑 [HACKMITTEN 3.0] Updated Login Credentials — Team ${opts.teamName}`,
+      html: credentialsUpdateEmailHtml({
+        leaderName: opts.leaderName,
+        teamName: opts.teamName,
+        username: opts.username,
+        password: opts.password,
+        registrationId: opts.registrationId,
+      }),
+      text: `HACKMITTEN 3.0 LOGIN CREDENTIALS UPDATED\n\nTeam: ${opts.teamName}\nUsername: ${opts.username}\nPassword: ${opts.password || "Unchanged"}\n\nSign in to participant portal: https://hackmitten-3-0.mitt.edu.in/login?role=PARTICIPANT`,
+    });
+    results.push(res);
+  }
+  return results;
+}
+
 

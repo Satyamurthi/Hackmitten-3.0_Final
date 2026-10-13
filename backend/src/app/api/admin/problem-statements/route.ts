@@ -32,6 +32,18 @@ export async function GET() {
             enabled: true,
           },
         },
+        acceptedByTeams: {
+          select: {
+            id: true,
+            teamName: true,
+            registrationId: true,
+            degree: true,
+            domainName: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: [{ createdAt: "desc" }],
     });

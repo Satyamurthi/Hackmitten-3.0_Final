@@ -121,6 +121,21 @@ export async function POST(req: Request) {
     }
 
     const degree = parsed.data.degree ?? null;
+
+    // Check category-specific limits (Diploma capacity limit)
+    if (degree === "Diploma") {
+      const eventCfg = await db.eventConfig.findUnique({ where: { id: "singleton" } });
+      if (eventCfg?.diplomaRegistrationLimit && eventCfg.diplomaRegistrationLimit > 0) {
+        const diplomaCount = await db.team.count({ where: { degree: "Diploma" } });
+        if (diplomaCount >= eventCfg.diplomaRegistrationLimit) {
+          return NextResponse.json(
+            { error: "Diploma category registration is full. All spots have been filled.", code: "DIPLOMA_REG_FULL" },
+            { status: 403 },
+          );
+        }
+      }
+    }
+
     const domainId = parsed.data.domainId ?? null;
     let domainRecord: { id: string; name: string; degrees: string[]; enabled: boolean } | null = null;
     if (domainId) {

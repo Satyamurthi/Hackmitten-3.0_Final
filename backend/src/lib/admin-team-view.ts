@@ -12,6 +12,10 @@ export const ADMIN_TEAM_SELECT = {
   domainId: true,
   domainName: true,
   domain: { select: { id: true, name: true, degrees: true } },
+  participantPassword: true,
+  loginUsername: true,
+  acceptedProblemStatementId: true,
+  acceptedProblemStatement: { select: { id: true, title: true } },
   createdAt: true,
   members: {
     select: {

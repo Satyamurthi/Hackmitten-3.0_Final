@@ -18,11 +18,20 @@ import {
   X,
   Layers,
   GraduationCap,
-  Clock,
-  Lock,
-  Unlock,
+  Download,
+  Users,
 } from "lucide-react";
 import { QuillEditor } from "./quill-editor";
+
+export interface AcceptedTeamSummary {
+  id: string;
+  teamName: string;
+  registrationId: string | null;
+  degree: string | null;
+  domainName: string | null;
+  status: string;
+  createdAt: string;
+}
 
 export interface ProblemStatementItem {
   id: string;
@@ -37,6 +46,7 @@ export interface ProblemStatementItem {
     enabled: boolean;
   } | null;
   isPublished: boolean;
+  acceptedByTeams?: AcceptedTeamSummary[];
   createdAt: string;
   updatedAt: string;
 }
@@ -78,56 +88,6 @@ export function ProblemStatementsManager() {
     queryKey: ["admin-domains"],
     queryFn: () => request("/api/admin/domains"),
   });
-
-  // Config query for problem statement release schedule
-  const { data: configData, refetch: refetchConfig } = useQuery<{
-    config: {
-      problemStatementsReleaseTime?: string | null;
-      problemStatementsReleased?: boolean;
-    };
-  }>({
-    queryKey: ["admin-config-release"],
-    queryFn: () => request("/api/admin/config"),
-  });
-
-  const releaseTime = configData?.config?.problemStatementsReleaseTime || "";
-  const isManuallyReleased = configData?.config?.problemStatementsReleased === true;
-  const [scheduleTimeInput, setScheduleTimeInput] = useState("");
-  const [updatingRelease, setUpdatingRelease] = useState(false);
-
-  useEffect(() => {
-    if (configData?.config?.problemStatementsReleaseTime) {
-      setScheduleTimeInput(configData.config.problemStatementsReleaseTime.slice(0, 16));
-    }
-  }, [configData?.config?.problemStatementsReleaseTime]);
-
-  const handleUpdateRelease = async (timeVal: string | null, manualVal: boolean) => {
-    setUpdatingRelease(true);
-    setActionError(null);
-    setSuccessMessage(null);
-    try {
-      await request("/api/admin/config", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          problemStatementsReleaseTime: timeVal ? new Date(timeVal).toISOString() : null,
-          problemStatementsReleased: manualVal,
-        }),
-      });
-      await refetchConfig();
-      setSuccessMessage(
-        manualVal
-          ? "Problem statements are now unlocked immediately and visible on participant dashboards!"
-          : timeVal
-          ? `Problem statements will unlock on schedule: ${new Date(timeVal).toLocaleString()}`
-          : "Release schedule cleared."
-      );
-    } catch (err: any) {
-      setActionError(err.message || "Failed to update release settings.");
-    } finally {
-      setUpdatingRelease(false);
-    }
-  };
 
   // State
   const [selectedDegree, setSelectedDegree] = useState<string>("ALL");
@@ -307,6 +267,88 @@ export function ProblemStatementsManager() {
     return true;
   });
 
+  const exportProblemSelectionsCsv = () => {
+    if (filteredItems.length === 0) return;
+
+    const headers = [
+      "Problem Statement ID",
+      "Problem Statement Title",
+      "Domain",
+      "Eligible Degrees",
+      "Total Teams Selected",
+      "Selected Team Name",
+      "Selected Team ID / Reg ID",
+      "Team Degree",
+      "Team Domain",
+      "Team Status",
+    ];
+
+    const escapeCsv = (val: any) => {
+      const str = String(val ?? "");
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows: string[] = [];
+    filteredItems.forEach((ps) => {
+      const teamsForPs = (ps.acceptedByTeams || []).filter((t) => {
+        if (selectedDomain === "ALL") return true;
+        return ps.domainId ? ps.domainId === selectedDomain : true;
+      });
+
+      if (teamsForPs.length === 0) {
+        rows.push(
+          [
+            escapeCsv(ps.id),
+            escapeCsv(ps.title),
+            escapeCsv(ps.domain?.name || "General"),
+            escapeCsv(ps.degrees.join("; ")),
+            escapeCsv(0),
+            escapeCsv("— (No team selected)"),
+            escapeCsv("—"),
+            escapeCsv("—"),
+            escapeCsv("—"),
+            escapeCsv("—"),
+          ].join(",")
+        );
+      } else {
+        teamsForPs.forEach((team) => {
+          rows.push(
+            [
+              escapeCsv(ps.id),
+              escapeCsv(ps.title),
+              escapeCsv(ps.domain?.name || "General"),
+              escapeCsv(ps.degrees.join("; ")),
+              escapeCsv(teamsForPs.length),
+              escapeCsv(team.teamName),
+              escapeCsv(team.registrationId || team.id),
+              escapeCsv(team.degree || "—"),
+              escapeCsv(team.domainName || "—"),
+              escapeCsv(team.status),
+            ].join(",")
+          );
+        });
+      }
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const domainSuffix = selectedDomain !== "ALL" ? `_domain_${selectedDomain}` : "";
+    link.setAttribute(
+      "download",
+      `problem_statement_selections${domainSuffix}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Header */}
@@ -324,13 +366,24 @@ export function ProblemStatementsManager() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openAddModal}
-          className="flex min-h-11 items-center gap-2 rounded-full bg-[#B52A32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#D83A43] transition-all shadow-[0_0_20px_rgba(181,42,50,0.3)]"
-        >
-          <Plus size={16} /> Add Problem Statement
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={exportProblemSelectionsCsv}
+            disabled={filteredItems.length === 0}
+            className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-all disabled:opacity-40"
+            title="Export CSV of which team selected which problem statement"
+          >
+            <Download size={15} /> Export Selections CSV
+          </button>
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="flex min-h-11 items-center gap-2 rounded-full bg-[#B52A32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#D83A43] transition-all shadow-[0_0_20px_rgba(181,42,50,0.3)]"
+          >
+            <Plus size={16} /> Add Problem Statement
+          </button>
+        </div>
       </header>
 
       {/* Notifications */}
@@ -352,87 +405,6 @@ export function ProblemStatementsManager() {
           <span>{successMessage}</span>
         </div>
       )}
-
-      {/* ─── Problem Statement Release Schedule (Timer & Direct Unlock) ─── */}
-      <div className="rounded-xl border border-white/10 bg-[#0e0e0e] p-4 sm:p-5 space-y-3 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex items-center gap-2.5">
-            <Clock size={18} className="text-[#B52A32] shrink-0" />
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
-                Problem Statement Release Schedule
-                {isManuallyReleased ? (
-                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-normal">
-                    Unlocked Now (Visible to Participants)
-                  </span>
-                ) : releaseTime ? (
-                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-normal">
-                    Scheduled: {new Date(releaseTime).toLocaleString()}
-                  </span>
-                ) : (
-                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-[#A8A8A8] border border-white/10 font-normal">
-                    Locked (No Timer Set)
-                  </span>
-                )}
-              </h3>
-              <p className="text-xs text-[#A8A8A8] mt-0.5">
-                Participants see a live countdown timer until this moment. Problem statements will only display on participant dashboards after this countdown expires or if unlocked.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              disabled={updatingRelease}
-              onClick={() => handleUpdateRelease(releaseTime || null, !isManuallyReleased)}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                isManuallyReleased
-                  ? "bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20"
-                  : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20"
-              }`}
-            >
-              {isManuallyReleased ? <Lock size={12} /> : <Unlock size={12} />}
-              {isManuallyReleased ? "Lock Problem Statements" : "Unlock Immediately"}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-1">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="mono text-[11px] text-[#A8A8A8] uppercase tracking-wider shrink-0">
-              Set Release Time:
-            </span>
-            <input
-              type="datetime-local"
-              value={scheduleTimeInput}
-              onChange={(e) => setScheduleTimeInput(e.target.value)}
-              className="rounded-lg border border-white/10 bg-[#161616] px-3 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
-            />
-          </div>
-          <button
-            type="button"
-            disabled={updatingRelease || !scheduleTimeInput}
-            onClick={() => handleUpdateRelease(scheduleTimeInput, false)}
-            className="rounded-lg bg-[#B52A32] hover:bg-[#D83A43] text-white px-3.5 py-1.5 text-xs font-semibold transition-all disabled:opacity-40"
-          >
-            Save Release Timer
-          </button>
-          {releaseTime && (
-            <button
-              type="button"
-              disabled={updatingRelease}
-              onClick={() => {
-                setScheduleTimeInput("");
-                handleUpdateRelease(null, false);
-              }}
-              className="text-xs text-[#A8A8A8] hover:text-white underline ml-1"
-            >
-              Clear Timer
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* Filter & Control Bar */}
       <div className="rounded-xl border border-white/5 bg-[#080808] p-4 space-y-4">
@@ -583,91 +555,140 @@ export function ProblemStatementsManager() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-xl border transition-all p-5 ${
-                item.isPublished
-                  ? "border-white/10 bg-[#080808] hover:border-white/20"
-                  : "border-white/5 bg-[#080808]/50 opacity-80 hover:opacity-100"
-              }`}
-            >
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div className="space-y-2.5 flex-1">
-                  {/* Badges row */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Status badge */}
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider ${
-                        item.isPublished
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                          : "bg-zinc-800 text-zinc-400 border border-zinc-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          item.isPublished ? "bg-emerald-400" : "bg-zinc-500"
-                        }`}
-                      />
-                      {item.isPublished ? "Published" : "Draft"}
-                    </span>
+          {filteredItems.map((item) => {
+            const teamsForThisPs = (item.acceptedByTeams || []).filter((t) => {
+              if (selectedDomain === "ALL") return true;
+              return item.domainId ? item.domainId === selectedDomain : true;
+            });
 
-                    {/* Domain badge */}
-                    {item.domain ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        <Layers size={12} /> {item.domain.name}
+            return (
+              <div
+                key={item.id}
+                className={`rounded-xl border transition-all p-5 ${
+                  item.isPublished
+                    ? "border-white/10 bg-[#080808] hover:border-white/20"
+                    : "border-white/5 bg-[#080808]/50 opacity-80 hover:opacity-100"
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="space-y-2.5 flex-1">
+                    {/* Badges row */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Status badge */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider ${
+                          item.isPublished
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            item.isPublished ? "bg-emerald-400" : "bg-zinc-500"
+                          }`}
+                        />
+                        {item.isPublished ? "Published" : "Draft"}
                       </span>
+
+                      {/* Domain badge */}
+                      {item.domain ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <Layers size={12} /> {item.domain.name}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-white/5 text-[#A8A8A8] border border-white/10">
+                          General Domain
+                        </span>
+                      )}
+
+                      {/* Degree Category Badges */}
+                      <div className="flex items-center gap-1">
+                        {item.degrees.map((deg) => {
+                          let colorClasses =
+                            "bg-purple-500/10 text-purple-300 border-purple-500/30";
+                          if (deg === "Diploma") {
+                            colorClasses =
+                              "bg-amber-500/10 text-amber-300 border-amber-500/30";
+                          } else if (deg === "UG") {
+                            colorClasses =
+                              "bg-cyan-500/10 text-cyan-300 border-cyan-500/30";
+                          }
+                          return (
+                            <span
+                              key={deg}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${colorClasses}`}
+                            >
+                              <GraduationCap size={11} /> {deg}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Teams selected count badge */}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          teamsForThisPs.length > 0
+                            ? "bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                            : "bg-white/5 text-[#888] border border-white/10"
+                        }`}
+                      >
+                        <Users size={11} />
+                        {teamsForThisPs.length} {teamsForThisPs.length === 1 ? "team" : "teams"} selected
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-lg font-bold text-white tracking-tight">{item.title}</h3>
+
+                    {/* Description */}
+                    {item.description?.includes("<") ? (
+                      <div
+                        className="text-sm text-[#CCCCCC] leading-relaxed prose prose-invert prose-sm max-w-none [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:bg-black/50 [&_pre]:p-2 [&_pre]:rounded [&_blockquote]:border-l-2 [&_blockquote]:border-[#B52A32] [&_blockquote]:pl-3"
+                        dangerouslySetInnerHTML={{ __html: item.description }}
+                      />
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-white/5 text-[#A8A8A8] border border-white/10">
-                        General Domain
-                      </span>
+                      <p className="text-sm text-[#A8A8A8] whitespace-pre-line leading-relaxed">
+                        {item.description}
+                      </p>
                     )}
 
-                    {/* Degree Category Badges */}
-                    <div className="flex items-center gap-1">
-                      {item.degrees.map((deg) => {
-                        let colorClasses =
-                          "bg-purple-500/10 text-purple-300 border-purple-500/30";
-                        if (deg === "Diploma") {
-                          colorClasses =
-                            "bg-amber-500/10 text-amber-300 border-amber-500/30";
-                        } else if (deg === "UG") {
-                          colorClasses =
-                            "bg-cyan-500/10 text-cyan-300 border-cyan-500/30";
-                        }
-                        return (
-                          <span
-                            key={deg}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${colorClasses}`}
-                          >
-                            <GraduationCap size={11} /> {deg}
-                          </span>
-                        );
-                      })}
+                    {/* Selected teams list */}
+                    <div className="pt-2 border-t border-white/5 space-y-1.5">
+                      <div className="text-xs font-semibold text-white/90 flex items-center gap-1.5">
+                        <Users size={12} className="text-[#B52A32]" />
+                        Selected by {teamsForThisPs.length} {teamsForThisPs.length === 1 ? "team" : "teams"}:
+                      </div>
+                      {teamsForThisPs.length === 0 ? (
+                        <p className="text-xs text-[#666] italic">No team has selected this problem statement yet.</p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {teamsForThisPs.map((t) => (
+                            <span
+                              key={t.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-white/5 border border-white/10 text-white"
+                              title={`Team ID: ${t.registrationId || t.id} · Degree: ${t.degree || "—"} · Domain: ${t.domainName || "—"}`}
+                            >
+                              <span className="font-semibold text-white">{t.teamName}</span>
+                              <span className="mono text-[10px] text-[#B52A32] font-semibold">
+                                ({t.registrationId || t.id.slice(0, 8)})
+                              </span>
+                              {t.degree && (
+                                <span className="mono text-[9px] px-1 py-0.2 rounded bg-white/10 text-[#A8A8A8]">
+                                  {t.degree}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Timestamps */}
+                    <div className="mono text-[11px] text-[#666] pt-1">
+                      Created: {new Date(item.createdAt).toLocaleDateString()} · Updated:{" "}
+                      {new Date(item.updatedAt).toLocaleDateString()}
                     </div>
                   </div>
-
-                  {/* Title */}
-                  <h3 className="text-lg font-bold text-white tracking-tight">{item.title}</h3>
-
-                  {/* Description */}
-                  {item.description?.includes("<") ? (
-                    <div
-                      className="text-sm text-[#CCCCCC] leading-relaxed prose prose-invert prose-sm max-w-none [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:bg-black/50 [&_pre]:p-2 [&_pre]:rounded [&_blockquote]:border-l-2 [&_blockquote]:border-[#B52A32] [&_blockquote]:pl-3"
-                      dangerouslySetInnerHTML={{ __html: item.description }}
-                    />
-                  ) : (
-                    <p className="text-sm text-[#A8A8A8] whitespace-pre-line leading-relaxed">
-                      {item.description}
-                    </p>
-                  )}
-
-                  {/* Timestamps */}
-                  <div className="mono text-[11px] text-[#666] pt-1">
-                    Created: {new Date(item.createdAt).toLocaleDateString()} · Updated:{" "}
-                    {new Date(item.updatedAt).toLocaleDateString()}
-                  </div>
-                </div>
 
                 {/* Actions column */}
                 <div className="flex items-center md:flex-col gap-2 shrink-0 md:pt-1">
@@ -718,7 +739,8 @@ export function ProblemStatementsManager() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -846,23 +868,6 @@ export function ProblemStatementsManager() {
                   onChange={setDescription}
                   placeholder="Describe the problem background, objective, expected deliverables, evaluation criteria, and constraints with styles, lists, and code blocks..."
                 />
-              </div>
-
-              {/* Publish immediately toggle */}
-              <div className="flex items-center gap-3 p-3.5 rounded-lg border border-white/10 bg-[#141414]">
-                <input
-                  type="checkbox"
-                  id="publishToggle"
-                  checked={isPublished}
-                  onChange={(e) => setIsPublished(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#B52A32] focus:ring-0"
-                />
-                <label htmlFor="publishToggle" className="cursor-pointer">
-                  <div className="text-xs font-semibold text-white">Publish to Participants</div>
-                  <div className="text-[11px] text-[#A8A8A8]">
-                    When checked, participants in the selected categories can see this on their dashboards.
-                  </div>
-                </label>
               </div>
 
               {/* Form Buttons */}

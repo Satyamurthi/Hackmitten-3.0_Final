@@ -21,6 +21,7 @@ import {
 type Config = {
   registrationEnabled: boolean;
   registrationLimit: number | null;
+  diplomaRegistrationLimit?: number | null;
   eventStartDate?: string | null;
   eventStartTime?: string | null;
   problemStatementsReleaseTime?: string | null;
@@ -71,6 +72,7 @@ export function EventSettingsEditor() {
   const form = draft ?? configData?.config ?? {
     registrationEnabled: false,
     registrationLimit: null,
+    diplomaRegistrationLimit: null,
     eventStartDate: null,
     eventStartTime: null,
     problemStatementsReleaseTime: null,
@@ -91,6 +93,7 @@ export function EventSettingsEditor() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          diplomaRegistrationLimit: form.diplomaRegistrationLimit !== undefined ? form.diplomaRegistrationLimit : null,
           eventStartDate: form.eventStartDate || null,
           eventStartTime: form.eventStartTime || null,
           problemStatementsReleaseTime: form.problemStatementsReleaseTime || null,
@@ -301,7 +304,7 @@ export function EventSettingsEditor() {
         ? `/api/uploads/${qr.fileName}`
         : "/api/payment-qr")
     );
-    setQrFormActive(qr.isActive);
+    setQrFormActive(qr.isActive !== undefined ? Boolean(qr.isActive) : true);
     setQrFormError(null);
     setQrModalOpen(true);
   };
@@ -520,26 +523,49 @@ export function EventSettingsEditor() {
                 />
               </label>
 
-              <label className="block">
-                <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-                  Registration Capacity Limit
-                </span>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.registrationLimit ?? ""}
-                  onChange={(event) =>
-                    setDraft({
-                      ...form,
-                      registrationLimit:
-                        event.target.value === "" ? null : Math.max(1, Number(event.target.value)),
-                    })
-                  }
-                  placeholder="Unlimited"
-                  className="mt-1 w-full rounded border border-white/10 bg-[#080808] px-3 py-2 text-sm text-white"
-                />
-                <span className="mt-1 block text-xs text-[#A8A8A8]">Leave blank for no limit.</span>
-              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                    General / UG &amp; PG Capacity Limit
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.registrationLimit ?? ""}
+                    onChange={(event) =>
+                      setDraft({
+                        ...form,
+                        registrationLimit:
+                          event.target.value === "" ? null : Math.max(1, Number(event.target.value)),
+                      })
+                    }
+                    placeholder="Unlimited"
+                    className="mt-1 w-full rounded border border-white/10 bg-[#080808] px-3 py-2 text-sm text-white"
+                  />
+                  <span className="mt-1 block text-xs text-[#A8A8A8]">Leave blank for no limit on UG &amp; PG.</span>
+                </label>
+
+                <label className="block">
+                  <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                    Diploma Registration Capacity Limit
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.diplomaRegistrationLimit ?? ""}
+                    onChange={(event) =>
+                      setDraft({
+                        ...form,
+                        diplomaRegistrationLimit:
+                          event.target.value === "" ? null : Math.max(1, Number(event.target.value)),
+                      })
+                    }
+                    placeholder="Unlimited"
+                    className="mt-1 w-full rounded border border-white/10 bg-[#080808] px-3 py-2 text-sm text-white"
+                  />
+                  <span className="mt-1 block text-xs text-[#A8A8A8]">Leave blank for no limit on Diploma teams.</span>
+                </label>
+              </div>
 
               {/* Problem Statements Release Schedule & Countdown */}
               <div className="rounded-lg border border-white/10 bg-[#080808] p-4 space-y-4">
@@ -1062,7 +1088,7 @@ export function EventSettingsEditor() {
               <label className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#080808] p-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={qrFormActive}
+                  checked={Boolean(qrFormActive)}
                   onChange={(e) => setQrFormActive(e.target.checked)}
                   className="h-4 w-4 accent-[#B52A32]"
                 />

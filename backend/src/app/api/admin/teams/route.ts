@@ -10,9 +10,11 @@ import {
   nextRegistrationSequence,
 } from "@/lib/constants";
 import { storeParticipantImage, storePaymentScreenshot, deletePrivateFile } from "@/lib/upload";
-import { sendEmail, approvalEmailHtml, approvalEmailText } from "@/lib/email";
+import { sendEmail, approvalEmailHtml, approvalEmailText, sendCredentialsEmailToTeam } from "@/lib/email";
 import { attemptRegistrationAcknowledgement } from "@/lib/registration-acknowledgement";
 import { normalizeTeamName } from "@/lib/team-name";
+import { generateSimpleParticipantPassword } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 function sanitizeAdminTeam(team: any) {
   if (!team) return team;
@@ -166,6 +168,22 @@ export async function POST(req: Request) {
       }
     }
 
+    const leaderMember = members.find((m) => m.isLeader) || members[0];
+    const assignedPassword = (
+      typeof bodyData.participantPassword === "string" && bodyData.participantPassword.trim()
+        ? bodyData.participantPassword.trim()
+        : typeof bodyData.password === "string" && bodyData.password.trim()
+        ? bodyData.password.trim()
+        : generateSimpleParticipantPassword(leaderMember?.fullName)
+    );
+    const assignedUsername = (
+      typeof bodyData.loginUsername === "string" && bodyData.loginUsername.trim()
+        ? bodyData.loginUsername.trim().toLowerCase()
+        : typeof bodyData.username === "string" && bodyData.username.trim()
+        ? bodyData.username.trim().toLowerCase()
+        : leaderMember?.email?.toLowerCase().trim() || ""
+    );
+
     // Transactional creation
     const { createdTeam, regIdForEmail } = await db.$transaction(async (tx) => {
       const team = await tx.team.create({
@@ -176,6 +194,8 @@ export async function POST(req: Request) {
           domainId: domainRecord?.id ?? null,
           domainName: domainRecord?.name ?? null,
           status: wantApproved ? "APPROVED" : "SUBMITTED",
+          participantPassword: assignedPassword,
+          loginUsername: assignedUsername,
         },
       });
 
@@ -258,6 +278,27 @@ export async function POST(req: Request) {
         });
       }
 
+      // Create or update participant user account for authentication
+      if (leaderMember?.email && assignedPassword) {
+        const passwordHash = await bcrypt.hash(assignedPassword, 10);
+        await tx.user.upsert({
+          where: { email: leaderMember.email.toLowerCase().trim() },
+          update: {
+            name: leaderMember.fullName,
+            username: assignedUsername || leaderMember.email.toLowerCase().trim(),
+            role: "PARTICIPANT",
+            passwordHash,
+          },
+          create: {
+            email: leaderMember.email.toLowerCase().trim(),
+            username: assignedUsername || leaderMember.email.toLowerCase().trim(),
+            name: leaderMember.fullName,
+            role: "PARTICIPANT",
+            passwordHash,
+          },
+        });
+      }
+
       const freshTeam = await tx.team.findUniqueOrThrow({
         where: { id: team.id },
         select: ADMIN_TEAM_SELECT,
@@ -307,6 +348,18 @@ export async function POST(req: Request) {
       // Send acknowledgement email to team leader
       attemptRegistrationAcknowledgement(createdTeam.id).catch((err) => {
         console.error("[admin/teams] Failed to send registration acknowledgement:", err);
+      });
+    }
+
+    // Send login credentials email to team members if requested (default: true)
+    if (bodyData.sendCredentialsEmail !== false && assignedPassword) {
+      sendCredentialsEmailToTeam({
+        teamId: createdTeam.id,
+        teamName: createdTeam.teamName,
+        username: assignedUsername || leaderMember?.email?.toLowerCase().trim() || "",
+        password: assignedPassword,
+      }).catch((err) => {
+        console.error("[admin/teams] Failed to send credentials email on creation:", err);
       });
     }
 
