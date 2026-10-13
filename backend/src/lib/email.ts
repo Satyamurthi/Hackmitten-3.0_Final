@@ -547,6 +547,15 @@ export async function sendHourlyRegistrationReportEmail(opts: {
   });
 }
 
+export interface TeamMemberAlertItem {
+  fullName: string;
+  email: string;
+  phone: string;
+  degree?: string | null;
+  college?: string | null;
+  isLeader?: boolean;
+}
+
 export interface NewTeamAlertPayload {
   teamName: string;
   college: string | null;
@@ -556,6 +565,7 @@ export interface NewTeamAlertPayload {
   leaderEmail: string;
   leaderPhone: string;
   memberCount: number;
+  members?: TeamMemberAlertItem[];
   teamId: string;
   totalTeams: number;
   registeredCount: number;
@@ -570,6 +580,26 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
   const leaderEmail = escapeHtml(data.leaderEmail);
   const leaderPhone = escapeHtml(data.leaderPhone);
   const teamId = escapeHtml(data.teamId);
+
+  const membersRows = (data.members || []).map((m, idx) => {
+    const isLeader = m.isLeader || idx === 0;
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+        <td style="padding:10px 12px;font-family:'JetBrains Mono',monospace;color:#888888;font-size:11px;">${idx + 1}</td>
+        <td style="padding:10px 12px;color:#FFFFFF;font-weight:${isLeader ? "700" : "500"};font-size:12px;">
+          ${escapeHtml(m.fullName)}
+        </td>
+        <td style="padding:10px 12px;color:#A8A8A8;font-size:12px;">${escapeHtml(m.email)}</td>
+        <td style="padding:10px 12px;font-family:'JetBrains Mono',monospace;color:#A8A8A8;font-size:12px;">${escapeHtml(m.phone)}</td>
+        <td style="padding:10px 12px;font-size:11px;">
+          ${isLeader
+            ? `<span style="background:rgba(216,58,67,0.15);color:#D83A43;border:1px solid rgba(216,58,67,0.3);padding:2px 8px;border-radius:4px;font-weight:600;">Leader</span>`
+            : `<span style="background:rgba(255,255,255,0.05);color:#888888;padding:2px 8px;border-radius:4px;">Member</span>`
+          }
+        </td>
+      </tr>
+    `;
+  }).join("");
 
   return `
 <!DOCTYPE html>
@@ -623,7 +653,7 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
 
           <!-- Details Table -->
           <tr>
-            <td style="padding:0 32px 32px;">
+            <td style="padding:0 32px 24px;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
                 <tr>
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;width:140px;">Team Name</td>
@@ -632,7 +662,7 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
                 <tr>
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Category & Domain</td>
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">
-                    <strong>${degree}</strong> · Domain: <span style="color:#D83A43;">${domainName}</span>
+                    <strong>${degree}</strong> · Domain: <span style="color:#D83A43;font-weight:600;">${domainName}</span>
                   </td>
                 </tr>
                 <tr>
@@ -642,7 +672,7 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
                 <tr>
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Team Leader</td>
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">
-                    ${leaderName} (${leaderEmail} · ${leaderPhone})
+                    <strong>${leaderName}</strong> (<a href="mailto:${leaderEmail}" style="color:#D83A43;text-decoration:none;">${leaderEmail}</a> · <a href="tel:${leaderPhone}" style="color:#FFFFFF;text-decoration:none;">${leaderPhone}</a>)
                   </td>
                 </tr>
                 <tr>
@@ -654,12 +684,37 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
                   <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;color:#D83A43;font-size:12px;">${teamId}</td>
                 </tr>
               </table>
+            </td>
+          </tr>
 
-              <div style="margin-top:24px;text-align:center;">
-                <a href="https://hackmitten-3-0.mitt.edu.in/admin/registrations" style="display:inline-block;background:#B52A32;color:#FFFFFF;text-decoration:none;font-size:12px;font-weight:600;padding:10px 24px;border-radius:20px;">
-                  View Team in Admin Dashboard →
-                </a>
-              </div>
+          ${
+            membersRows
+              ? `
+          <!-- Member Roster Table -->
+          <tr>
+            <td style="padding:0 32px 32px;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;color:#A8A8A8;margin-bottom:8px;letter-spacing:1px;">Team Members Roster</div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;">
+                <tr style="background:#181818;border-bottom:1px solid rgba(255,255,255,0.08);">
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;color:#A8A8A8;font-weight:600;">#</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;color:#A8A8A8;font-weight:600;">Name</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;color:#A8A8A8;font-weight:600;">Email</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;color:#A8A8A8;font-weight:600;">Phone</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;color:#A8A8A8;font-weight:600;">Role</th>
+                </tr>
+                ${membersRows}
+              </table>
+            </td>
+          </tr>
+          `
+              : ""
+          }
+
+          <tr>
+            <td style="padding:0 32px 32px;text-align:center;">
+              <a href="https://hackmitten-3-0.mitt.edu.in/admin/registrations" style="display:inline-block;background:#B52A32;color:#FFFFFF;text-decoration:none;font-size:12px;font-weight:600;padding:12px 28px;border-radius:24px;">
+                View Team in Admin Dashboard →
+              </a>
             </td>
           </tr>
         </table>
@@ -673,12 +728,33 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
 }
 
 export async function sendNewTeamAdminAlertEmail(data: NewTeamAlertPayload): Promise<EmailResult> {
-  const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "sharathhn613@gmail.com";
+  const recipients = new Set<string>();
+  // Primary designated recipient specified by user
+  recipients.add("sharathhn613@gmail.com");
+
+  if (process.env.ADMIN_NOTIFICATION_EMAIL?.trim()) {
+    process.env.ADMIN_NOTIFICATION_EMAIL.split(",").forEach((e) => {
+      const trimmed = e.trim();
+      if (trimmed && trimmed.includes("@")) recipients.add(trimmed);
+    });
+  }
+  if (process.env.ADMIN_EMAIL?.trim() && process.env.ADMIN_EMAIL.includes("@")) {
+    recipients.add(process.env.ADMIN_EMAIL.trim());
+  }
+
+  const toList = Array.from(recipients).join(", ");
+  const membersText = (data.members || [])
+    .map(
+      (m, idx) =>
+        `  ${idx + 1}. ${m.fullName}${m.isLeader ? " [LEADER]" : ""} | ${m.email} | ${m.phone} | ${m.degree || data.degree || "UG"}`
+    )
+    .join("\n");
+
   return sendEmail({
-    to: adminEmail,
-    subject: `[HACKMITTEN 3.0] New Team Registered: ${data.teamName} (Total: ${data.totalTeams})`,
+    to: toList,
+    subject: `🚨 [HACKMITTEN 3.0] New Team Registered: ${data.teamName} (${data.degree || "UG"} · ${data.domainName || "Track"}) | Total: ${data.totalTeams}`,
     html: newTeamRegistrationAdminAlertHtml(data),
-    text: `HACKMITTEN 3.0 NEW TEAM REGISTRATION ALERT\n\nTeam: ${data.teamName}\nCategory: ${data.degree}\nDomain: ${data.domainName}\nCollege: ${data.college}\nLeader: ${data.leaderName} (${data.leaderEmail}, ${data.leaderPhone})\nMembers: ${data.memberCount}\nTeam ID: ${data.teamId}\n\nTotal Teams: ${data.totalTeams}\nRegistered Count: ${data.registeredCount}\n\nDashboard: https://hackmitten-3-0.mitt.edu.in/admin/registrations`,
+    text: `HACKMITTEN 3.0 NEW TEAM REGISTRATION ALERT\n\nTeam: ${data.teamName}\nCategory: ${data.degree || "UG"}\nDomain Track: ${data.domainName || "N/A"}\nCollege: ${data.college || "N/A"}\nTeam ID: ${data.teamId}\n\nSUMMARY STATS:\nTotal Registered Teams: ${data.totalTeams}\nActive/Registered Count: ${data.registeredCount}\n\nTEAM MEMBERS (${data.memberCount}):\n${membersText || `  Leader: ${data.leaderName} (${data.leaderEmail}, ${data.leaderPhone})`}\n\nAdmin Dashboard: https://hackmitten-3-0.mitt.edu.in/admin/registrations`,
   });
 }
 
