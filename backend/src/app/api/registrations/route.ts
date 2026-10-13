@@ -8,6 +8,7 @@ import { attemptRegistrationAcknowledgement } from "@/lib/registration-acknowled
 import { deletePrivateFile, storeParticipantImage, UploadError } from "@/lib/upload";
 import { createRegistrationAccessToken, hashRegistrationAccessToken, registrationAccessCookieName, REGISTRATION_ACCESS_COOKIE_MAX_AGE_SECONDS } from "@/lib/registration-access";
 import { generateQrToken } from "@/lib/constants";
+import bcrypt from "bcryptjs";
 
 type RawQueryClient = Pick<typeof db, "$queryRaw">;
 
@@ -220,6 +221,29 @@ export async function POST(req: Request) {
     }
 
     const acknowledgementEmailSent = await attemptRegistrationAcknowledgement(team.id);
+
+    // ─── Generate Participant Login Account (Leader Email + Team ID) ───
+    const leader = team.members.find((m) => m.isLeader) || team.members[0];
+    if (leader) {
+      const leaderEmail = leader.email.toLowerCase().trim();
+      const passwordHash = await bcrypt.hash(team.id, 10);
+      await db.user.upsert({
+        where: { email: leaderEmail },
+        update: {
+          role: "PARTICIPANT",
+          passwordHash,
+          name: leader.fullName,
+        },
+        create: {
+          email: leaderEmail,
+          username: leaderEmail,
+          name: leader.fullName,
+          role: "PARTICIPANT",
+          passwordHash,
+        },
+      }).catch((e) => console.warn("[registrations] leader user upsert non-blocking error:", e));
+    }
+
     const {
       registrationAccessTokenHash: _registrationAccessTokenHash,
       registrationAccessExpiresAt: _registrationAccessExpiresAt,
@@ -229,7 +253,14 @@ export async function POST(req: Request) {
       ...teamWithoutAccessHash,
       members: teamWithoutAccessHash.members.map(({ participantImagePath: _path, participantImageMimeType: _mime, participantImageSizeBytes: _size, ...member }) => member),
     };
-    const response = NextResponse.json({ team: publicTeam, acknowledgementEmailSent }, { status: 201 });
+    const credentials = leader
+      ? {
+          username: leader.email.toLowerCase().trim(),
+          password: team.id,
+          teamId: team.id,
+        }
+      : null;
+    const response = NextResponse.json({ team: publicTeam, credentials, acknowledgementEmailSent }, { status: 201 });
     const cookieName = registrationAccessCookieName(team.id);
     if (cookieName) {
       response.cookies.set(cookieName, registrationAccessToken, {

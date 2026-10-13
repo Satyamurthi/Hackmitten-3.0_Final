@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { Countdown } from "./countdown";
 import { useEventState } from "@/components/auth/use-event-state";
+import { useRegistrationModal } from "@/components/public/use-registration-modal";
 
 export function Hero() {
+  const openRegistrationModal = useRegistrationModal((s) => s.open);
   const eventState = useEventState();
   const regOpen = eventState.data?.registrationOpen ?? false; // fail closed while loading/error
   // Registration is unavailable when the admin has closed it or capacity is reached.
@@ -22,7 +24,6 @@ export function Hero() {
   const subtitleLines = subtitle.split("|").map((s) => s.trim()).filter(Boolean);
   const description = "24 HOURS. BUILD. INNOVATE. CREATE.";
   const ctaText = "REGISTER NOW";
-  const ctaLink = "/register";
 
   return (
     <section
@@ -116,13 +117,14 @@ export function Hero() {
 
         <div className="hero-reveal hero-reveal-delay-5 mt-10 flex flex-col sm:flex-row gap-3">
           {regOpen && !isFull ? (
-            <Link
-              href={ctaLink}
+            <button
+              type="button"
+              onClick={() => openRegistrationModal("options")}
               className="hero-primary-cta group flex items-center justify-center gap-2 rounded-full bg-[#B52A32] px-6 md:px-8 py-3.5 text-sm font-semibold tracking-wide text-white transition-all hover:bg-[#D83A43] hover:shadow-[0_0_40px_-8px_rgba(216,58,67,0.8)] min-h-[44px]"
             >
               {ctaText}
               <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
-            </Link>
+            </button>
           ) : isFull ? (
             <div className="flex items-center justify-center gap-2 rounded-full border border-[#B52A32]/40 bg-[#B52A32]/10 px-6 md:px-8 py-3.5 text-sm font-semibold tracking-wide text-[#D83A43] min-h-[44px]">
               REGISTRATIONS FULL

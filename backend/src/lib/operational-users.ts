@@ -6,6 +6,7 @@ export const LOGIN_ROLE_MAP = {
   ADMIN: "SUPER_ADMIN",
   COORDINATOR: "COORDINATOR",
   FOOD: "FOOD_ADMIN",
+  PARTICIPANT: "PARTICIPANT",
 } as const satisfies Record<string, Role>;
 
 export type OperationalRole = (typeof LOGIN_ROLE_MAP)[keyof typeof LOGIN_ROLE_MAP];

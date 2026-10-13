@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEventState } from "@/components/auth/use-event-state";
+import { useRegistrationModal } from "./use-registration-modal";
 
 export function PublicNav() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const openRegistrationModal = useRegistrationModal((s) => s.open);
   const eventState = useEventState();
   const regOpen = eventState.data?.registrationOpen ?? true;
   // Registration is unavailable when the admin has closed it or capacity is reached.
@@ -73,14 +75,21 @@ export function PublicNav() {
                 <span className="absolute -bottom-1 left-0 h-px w-0 bg-[#B52A32] transition-all duration-300 group-hover:w-full" />
               </Link>
             ))}
+            <Link
+              href="/login?role=PARTICIPANT"
+              className="text-xs font-medium text-[#A8A8A8] hover:text-white transition-colors"
+            >
+              Team Login
+            </Link>
             {regOpen && !isFull ? (
-              <Link
-                href="/register"
+              <button
+                type="button"
+                onClick={() => openRegistrationModal("options")}
                 className="group flex items-center gap-2 rounded-full border border-[#B52A32] px-5 py-2 text-sm font-medium text-white transition-all hover:bg-[#B52A32] hover:shadow-[0_0_30px_-8px_rgba(216,58,67,0.7)]"
               >
                 Register Now
                 <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
-              </Link>
+              </button>
             ) : isFull ? (
               <span className="rounded-full border border-[#B52A32]/40 bg-[#B52A32]/10 px-5 py-2 text-sm font-medium text-[#D83A43]">
                 Full
@@ -119,17 +128,39 @@ export function PublicNav() {
             </button>
           </div>
           <div className="flex flex-1 flex-col justify-center gap-2 px-8">
-            {navLinks.map((link, i) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="display text-5xl sm:text-6xl font-bold text-white/80 hover:text-white transition-colors py-2"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                {link.label.toUpperCase()}
-              </Link>
-            ))}
+            {navLinks.map((link, i) =>
+              link.href === "/register" ? (
+                <button
+                  key={link.href}
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    openRegistrationModal("options");
+                  }}
+                  className="display text-left text-5xl sm:text-6xl font-bold text-[#D83A43] hover:text-white transition-colors py-2"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {link.label.toUpperCase()}
+                </button>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="display text-5xl sm:text-6xl font-bold text-white/80 hover:text-white transition-colors py-2"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {link.label.toUpperCase()}
+                </Link>
+              )
+            )}
+            <Link
+              href="/login?role=PARTICIPANT"
+              onClick={() => setOpen(false)}
+              className="mono text-left text-base uppercase tracking-wider text-[#D83A43] hover:text-white transition-colors py-3 mt-2 border-t border-white/10"
+            >
+              → Team Login / Dashboard
+            </Link>
             {!regOpen && !isFull && (
               <div className="display text-2xl font-bold text-[#A8A8A8] py-2 mt-4">
                 REGISTRATION CLOSED

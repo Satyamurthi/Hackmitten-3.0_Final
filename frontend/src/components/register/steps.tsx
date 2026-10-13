@@ -3,7 +3,7 @@
 import { useRegisterStore } from "./store";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus, Mail } from "lucide-react";
+import { ArrowRight, ArrowLeft, Plus, X, Check, Crown, AlertCircle, ImagePlus, Mail, LogIn } from "lucide-react";
 import Link from "next/link";
 import { normalizeTeamName } from "@/lib/team-name";
 import { compressImage } from "@/lib/image-compress";
@@ -947,7 +947,7 @@ export function StepPayment() {
 // ─── STEP 4: SUBMIT / CONFIRMATION ────────────────────────────────────────────
 
 export function StepSubmit() {
-  const { teamId, teamName, acknowledgementEmailSent, reset } = useRegisterStore();
+  const { teamId, teamName, members, acknowledgementEmailSent, reset } = useRegisterStore();
   const [showEmailModal, setShowEmailModal] = useState(true);
 
   return (
@@ -1050,10 +1050,51 @@ export function StepSubmit() {
         </p>
       </div>
 
+      {/* ─── PARTICIPANT LOGIN CREDENTIALS CARD ─── */}
       {teamId && (
-        <div className="glass rounded-lg p-6 mb-8">
-          <div className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">Reference</div>
-          <div className="mono text-sm md:text-lg text-[#B52A32] mt-1 select-all break-all">{teamId}</div>
+        <div className="rounded-xl border border-white/10 bg-[#121212] p-5 sm:p-6 mb-8 text-left space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+            <div>
+              <div className="mono text-[10px] uppercase tracking-widest text-[#B52A32] font-semibold">
+                Participant Portal
+              </div>
+              <h3 className="display text-lg font-bold text-white">Your Team Login Credentials</h3>
+            </div>
+            <span className="mono text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Credentials Ready
+            </span>
+          </div>
+
+          <p className="text-xs text-[#A8A8A8]">
+            Use these credentials to log in to your participant dashboard at any time to check approval status, view your category problem statements, and download digital passes.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-3 pt-1">
+            <div className="rounded-lg bg-black/40 border border-white/5 p-3.5">
+              <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Username (Leader Email)</div>
+              <div className="mono text-sm text-white font-medium mt-1 truncate select-all">
+                {members[0]?.email || "Team Leader Email"}
+              </div>
+            </div>
+            <div className="rounded-lg bg-black/40 border border-white/5 p-3.5">
+              <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Password (Team ID)</div>
+              <div className="mono text-sm text-[#D83A43] font-bold mt-1 select-all break-all">
+                {teamId}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <span className="text-[11px] text-[#A8A8A8]">
+              Password is your exact Team ID shown above. Keep it safe.
+            </span>
+            <Link
+              href="/login?role=PARTICIPANT"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#B52A32] hover:bg-[#D83A43] text-white px-5 py-2.5 text-xs font-semibold tracking-wide transition-all min-h-[38px] shadow-md"
+            >
+              <LogIn size={14} /> Go to Team Login
+            </Link>
+          </div>
         </div>
       )}
 

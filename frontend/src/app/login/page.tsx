@@ -4,23 +4,34 @@ import { useState } from "react";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, ShieldCheck, Users, UtensilsCrossed } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { ArrowLeft, Loader2, ShieldCheck, Users, UtensilsCrossed, GraduationCap } from "lucide-react";
 
-type Role = "ADMIN" | "COORDINATOR" | "FOOD";
+type Role = "ADMIN" | "COORDINATOR" | "FOOD" | "PARTICIPANT";
 
 const ROLE_OPTIONS: { id: Role; title: string; subtitle: string; icon: any; hint: string }[] = [
+  { id: "PARTICIPANT", title: "PARTICIPANT / TEAM", subtitle: "UG · PG · Diploma Team Dashboard", icon: GraduationCap, hint: "Access your dashboard using Team Leader Email & Team ID." },
   { id: "ADMIN", title: "ADMIN", subtitle: "Super Admin · root access", icon: ShieldCheck, hint: "Verify payments, approve teams, configure event, manage everything." },
   { id: "COORDINATOR", title: "COORDINATOR", subtitle: "Event operational coordinator", icon: Users, hint: "View approved teams and participant information for event operations." },
   { id: "FOOD", title: "FOOD COORDINATOR", subtitle: "Food check-in operator", icon: UtensilsCrossed, hint: "Scan participant QRs for meal check-ins and view consumption." },
 ];
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const roleParam = searchParams.get("role");
+    if (roleParam && ["ADMIN", "COORDINATOR", "FOOD", "PARTICIPANT"].includes(roleParam.toUpperCase())) {
+      setSelectedRole(roleParam.toUpperCase() as Role);
+    }
+  }, [searchParams]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +45,11 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (res?.error) {
-      setError("Invalid credentials. Please verify your username/email and password.");
+      if (selectedRole === "PARTICIPANT") {
+        setError("Invalid credentials. Please verify your Leader Email and Team ID.");
+      } else {
+        setError("Invalid credentials. Please verify your username/email and password.");
+      }
       return;
     }
     // Decide redirect based on actual session role
@@ -43,6 +58,7 @@ export default function LoginPage() {
     if (role === "SUPER_ADMIN") router.push("/admin");
     else if (role === "COORDINATOR") router.push("/coordinator");
     else if (role === "FOOD_ADMIN") router.push("/food-admin");
+    else if (role === "PARTICIPANT") router.push("/dashboard");
     else router.push("/");
   };
 
@@ -118,30 +134,35 @@ export default function LoginPage() {
 
             <label className="block mb-4">
               <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-                Username or Email
+                {selectedRole === "PARTICIPANT" ? "Team Leader Email" : "Username or Email"}
               </span>
               <input
-                type="text"
+                type={selectedRole === "PARTICIPANT" ? "email" : "text"}
                 required
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="mt-1 w-full bg-[#080808] border border-white/10 rounded px-3 py-2.5 text-white focus:border-[#B52A32] focus:outline-none transition-colors"
-                placeholder="Enter username"
-                autoComplete="username"
+                placeholder={selectedRole === "PARTICIPANT" ? "leader@gmail.com" : "Enter username"}
+                autoComplete={selectedRole === "PARTICIPANT" ? "email" : "username"}
               />
             </label>
 
             <label className="block mb-6">
-              <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-                Password
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                  {selectedRole === "PARTICIPANT" ? "Team ID (Password)" : "Password"}
+                </span>
+                {selectedRole === "PARTICIPANT" && (
+                  <span className="mono text-[9px] text-[#A8A8A8]">Assigned during registration</span>
+                )}
+              </div>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 w-full bg-[#080808] border border-white/10 rounded px-3 py-2.5 text-white focus:border-[#B52A32] focus:outline-none transition-colors"
-                placeholder="••••••••"
+                placeholder={selectedRole === "PARTICIPANT" ? "Enter your Team ID" : "••••••••"}
                 autoComplete="current-password"
               />
             </label>
@@ -158,7 +179,7 @@ export default function LoginPage() {
               className="w-full rounded-full bg-[#B52A32] disabled:opacity-50 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#D83A43] flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={14} className="animate-spin" />}
-              ENTER
+              {selectedRole === "PARTICIPANT" ? "ACCESS DASHBOARD" : "ENTER"}
             </button>
           </form>
         )}
@@ -171,5 +192,19 @@ export default function LoginPage() {
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#030303] flex items-center justify-center text-[#A8A8A8]">
+          <Loader2 size={24} className="animate-spin text-[#B52A32]" />
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

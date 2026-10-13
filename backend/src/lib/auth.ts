@@ -77,6 +77,65 @@ export const authOptions: NextAuthOptions = {
         const id = normalizeLoginIdentifier(String(credentials.identifier));
         const selectedRole = String(credentials.role);
 
+        // ─── Participant Authentication (Leader Email + Team ID) ───
+        if (selectedRole.trim().toUpperCase() === "PARTICIPANT") {
+          const email = id.toLowerCase();
+          const rawPassword = String(credentials.password).trim();
+
+          const leader = await db.participant.findFirst({
+            where: {
+              email,
+              isLeader: true,
+            },
+            include: {
+              team: true,
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (!leader || !leader.team) {
+            console.warn("[auth] participant login: leader not found for email:", email);
+            return null;
+          }
+
+          const team = leader.team;
+          const isMatch =
+            rawPassword.toLowerCase() === team.id.toLowerCase() ||
+            (Boolean(team.registrationId) && rawPassword.toLowerCase() === team.registrationId!.toLowerCase());
+
+          if (!isMatch) {
+            console.warn("[auth] participant login: password does not match team ID or registration ID");
+            return null;
+          }
+
+          const passwordHash = await bcrypt.hash(rawPassword, 10);
+          const user = await db.user.upsert({
+            where: { email },
+            update: {
+              role: "PARTICIPANT",
+              passwordHash,
+              name: leader.fullName,
+            },
+            create: {
+              email,
+              username: email,
+              name: leader.fullName,
+              role: "PARTICIPANT",
+              passwordHash,
+            },
+          });
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: leader.fullName || user.name || "Team Leader",
+            role: user.role,
+            sessionVersion: user.updatedAt.getTime(),
+            teamId: team.id,
+            degree: team.degree,
+          };
+        }
+
         const user = await findUserByLoginIdentifier(id);
 
         if (!user) return null;
@@ -115,6 +174,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
         token.sessionVersion = user.sessionVersion;
+        token.teamId = (user as any).teamId;
+        token.degree = (user as any).degree;
       }
       return token;
     },
@@ -123,6 +184,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.sessionVersion = token.sessionVersion;
+        session.user.teamId = token.teamId;
+        session.user.degree = token.degree;
       }
       return session;
     },
@@ -132,7 +195,7 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-// Type augmentation so role is visible on session.user
+// Type augmentation so role, teamId, and degree are visible on session.user
 declare module "next-auth" {
   interface Session {
     user: {
@@ -141,11 +204,15 @@ declare module "next-auth" {
       name?: string | null;
       role: import("@prisma/client").Role;
       sessionVersion: number;
+      teamId?: string | null;
+      degree?: string | null;
     };
   }
   interface User {
     role: import("@prisma/client").Role;
     sessionVersion: number;
+    teamId?: string | null;
+    degree?: string | null;
   }
 }
 
@@ -154,5 +221,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: import("@prisma/client").Role;
     sessionVersion: number;
+    teamId?: string | null;
+    degree?: string | null;
   }
 }

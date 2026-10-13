@@ -12,6 +12,7 @@ import { Venue } from "@/components/sections/venue";
 import { CTA } from "@/components/sections/cta";
 import { Footer } from "@/components/sections/footer";
 import { Reveal } from "@/components/ui/reveal";
+import { RegistrationEntryModal } from "@/components/public/registration-entry-modal";
 
 // Black hole 3D scene — loaded client-side only, with SSR disabled
 const SpaceScene = dynamic(
@@ -61,6 +62,7 @@ export default function HomePage() {
           <Reveal delay={100}><CTA /></Reveal>
         </main>
         <Footer />
+        <RegistrationEntryModal />
       </div>
     </div>
   );

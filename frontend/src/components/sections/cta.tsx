@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEventState } from "@/components/auth/use-event-state";
+import { useRegistrationModal } from "@/components/public/use-registration-modal";
 
 export function CTA() {
+  const openRegistrationModal = useRegistrationModal((s) => s.open);
   const eventState = useEventState();
   const regOpen = eventState.data?.registrationOpen ?? true;
 
@@ -26,13 +28,14 @@ export function CTA() {
               <br />
               Build something worth remembering.
             </p>
-            <Link
-              href="/register"
+            <button
+              type="button"
+              onClick={() => openRegistrationModal("options")}
               className="group mt-12 inline-flex items-center gap-3 rounded-full bg-[#B52A32] px-8 md:px-10 py-4 text-sm md:text-base font-semibold tracking-wide text-white transition-all hover:bg-[#D83A43] hover:shadow-[0_0_60px_-10px_rgba(216,58,67,0.9)] min-h-[44px]"
             >
               REGISTER NOW
               <span className="text-lg transition-transform duration-200 group-hover:translate-x-1">→</span>
-            </Link>
+            </button>
           </>
         ) : (
           <p className="mx-auto mt-8 max-w-md text-base md:text-lg text-[#A8A8A8]">
