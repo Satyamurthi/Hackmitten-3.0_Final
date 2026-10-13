@@ -28,9 +28,9 @@ export function Hero() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[100svh] flex-col items-center justify-center px-5 pt-24 md:pt-28 text-center"
+      className="relative flex min-h-[100svh] flex-col items-center justify-center px-5 pt-24 md:pt-28 text-center overflow-hidden"
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#030303] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#030303] pointer-events-none z-[1]" />
 
       {/* Side College Logos: Left (MITT) & Right (10 Years of Excellence) */}
       <div className="pointer-events-none absolute inset-x-0 top-14 sm:top-16 md:top-20 z-20 px-4 sm:px-8 md:px-12 lg:px-16 flex items-center justify-between">

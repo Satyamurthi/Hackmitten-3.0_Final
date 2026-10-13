@@ -13,6 +13,7 @@ import { CTA } from "@/components/sections/cta";
 import { Footer } from "@/components/sections/footer";
 import { Reveal } from "@/components/ui/reveal";
 import { RegistrationEntryModal } from "@/components/public/registration-entry-modal";
+import { IntroScreen } from "@/components/sections/intro-screen";
 
 // Black hole 3D scene — loaded client-side only, with SSR disabled
 const SpaceScene = dynamic(
@@ -36,6 +37,9 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
+      {/* Full-screen Opening Intro for HACKMITTEN 3.0 */}
+      <IntroScreen />
+
       {/* Cinematic 3D background — fixed, behind all content */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <SpaceScene scrollProgress={scrollProgress} />
