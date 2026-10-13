@@ -18,6 +18,7 @@ export type Permission =
   | "user:manage"
   | "credential:change"
   | "sponsor:manage"
+  | "problem:manage"
   | "export:data";
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -39,6 +40,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "user:manage",
     "credential:change",
     "sponsor:manage",
+    "problem:manage",
     "export:data",
   ],
   COORDINATOR: [

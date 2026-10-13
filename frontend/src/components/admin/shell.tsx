@@ -6,13 +6,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
   LayoutDashboard, Users, UtensilsCrossed, LogOut, Home,
-  Settings, KeyRound, UserCog, UsersRound, Handshake, type LucideIcon,
+  Settings, KeyRound, UserCog, UsersRound, Handshake, FileCode2, type LucideIcon,
 } from "lucide-react";
 
 const NAV: { label: string; href: string; roles: string[]; icon: LucideIcon }[] = [
   { label: "Dashboard", href: "/admin", roles: ["SUPER_ADMIN"], icon: LayoutDashboard },
   { label: "Registrations", href: "/admin/registrations", roles: ["SUPER_ADMIN"], icon: Users },
   { label: "Teams", href: "/admin/teams", roles: ["SUPER_ADMIN"], icon: UsersRound },
+  { label: "Problem Statements", href: "/admin/problem-statements", roles: ["SUPER_ADMIN"], icon: FileCode2 },
   { label: "Sponsors", href: "/admin/sponsors", roles: ["SUPER_ADMIN"], icon: Handshake },
   { label: "Food Check-ins", href: "/admin/food", roles: ["SUPER_ADMIN"], icon: UtensilsCrossed },
   { label: "Event Settings", href: "/admin/settings", roles: ["SUPER_ADMIN"], icon: Settings },

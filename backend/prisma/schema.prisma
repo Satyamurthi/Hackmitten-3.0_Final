@@ -128,10 +128,27 @@ model Domain {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teams     Team[]
+  teams             Team[]
+  problemStatements ProblemStatement[]
 
   @@index([enabled])
   @@index([name])
+}
+
+model ProblemStatement {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  degrees     String[] // ["Diploma"], ["UG"], ["PG"]
+  domainId    String?
+  domain      Domain?  @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([domainId])
+  @@index([createdAt])
 }
 
 model PaymentQrCode {
