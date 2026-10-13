@@ -49,9 +49,8 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
   useFrame((state, delta) => {
     const p = scrollProgress.current;
     if (groupRef.current) {
-      // Camera approaches the black hole as user scrolls — scale grows, but
-      // plateaus at ~2.0 so it stops growing infinitely.
-      const scale = Math.min(2.0, 1 + p * 1.2);
+      // Camera approaches the black hole as user scrolls — larger base scale for prominent visuals
+      const scale = Math.min(2.5, 1.35 + p * 1.3);
       groupRef.current.scale.setScalar(scale);
       // Subtle rotation
       groupRef.current.rotation.z += delta * 0.02;
@@ -71,9 +70,9 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
     }
   });
 
-  // Accretion disk geometry — torus with custom shader-like material via vertex colors
+  // Accretion disk geometry — enlarged radius for dramatic presence
   const diskGeo = useMemo(() => {
-    const geo = new THREE.RingGeometry(1.2, 3.6, 96, 1);
+    const geo = new THREE.RingGeometry(1.45, 4.4, 96, 1);
     return geo;
   }, []);
 
@@ -116,7 +115,7 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
         }
         void main() {
           // Normalized radius (0 inner, 1 outer)
-          float r = (vDist - 1.2) / (3.6 - 1.2);
+          float r = (vDist - 1.45) / (4.4 - 1.45);
           // Angular streaks
           float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
           float streaks = noise(vec2(angle * 6.0 + uTime * 0.4, r * 4.0));
@@ -142,20 +141,20 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
     <group ref={groupRef}>
       {/* Event horizon — pure black sphere */}
       <mesh ref={horizonRef}>
-        <sphereGeometry args={[1, 64, 64]} />
+        <sphereGeometry args={[1.2, 64, 64]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.95} />
       </mesh>
       {/* Photon ring glow */}
-      <mesh ref={glowRef} scale={1.08}>
+      <mesh ref={glowRef} scale={1.3}>
         <sphereGeometry args={[1, 32, 32]} />
-        <meshBasicMaterial color="#D83A43" transparent opacity={0.3} side={THREE.BackSide} />
+        <meshBasicMaterial color="#D83A43" transparent opacity={0.32} side={THREE.BackSide} />
       </mesh>
       {/* Accretion disk */}
       <mesh ref={diskRef} geometry={diskGeo} material={diskMat} />
       {/* Faint outer halo */}
-      <mesh scale={1.6}>
+      <mesh scale={1.95}>
         <sphereGeometry args={[1, 32, 32]} />
-        <meshBasicMaterial color="#8B1E24" transparent opacity={0.04} side={THREE.BackSide} />
+        <meshBasicMaterial color="#8B1E24" transparent opacity={0.05} side={THREE.BackSide} />
       </mesh>
     </group>
   );
@@ -283,7 +282,7 @@ export default function SpaceScene({ scrollProgress }: { scrollProgress: React.M
     <Canvas
       dpr={isMobile ? 1 : [1, 2]}
       gl={{ antialias: !isMobile, alpha: true, powerPreference: "high-performance" }}
-      camera={{ position: [0, 0.5, 8], fov: 55, near: 0.1, far: 100 }}
+      camera={{ position: [0, 0.4, 7.5], fov: 55, near: 0.1, far: 100 }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
       <color attach="background" args={["#030303"]} />

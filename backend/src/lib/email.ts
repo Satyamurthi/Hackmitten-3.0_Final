@@ -547,3 +547,139 @@ export async function sendHourlyRegistrationReportEmail(opts: {
   });
 }
 
+export interface NewTeamAlertPayload {
+  teamName: string;
+  college: string | null;
+  degree: string | null;
+  domainName: string | null;
+  leaderName: string;
+  leaderEmail: string;
+  leaderPhone: string;
+  memberCount: number;
+  teamId: string;
+  totalTeams: number;
+  registeredCount: number;
+}
+
+export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): string {
+  const teamName = escapeHtml(data.teamName);
+  const college = escapeHtml(data.college || "N/A");
+  const degree = escapeHtml(data.degree || "UG");
+  const domainName = escapeHtml(data.domainName || "Not Assigned");
+  const leaderName = escapeHtml(data.leaderName);
+  const leaderEmail = escapeHtml(data.leaderEmail);
+  const leaderPhone = escapeHtml(data.leaderPhone);
+  const teamId = escapeHtml(data.teamId);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#030303;font-family:'Inter',Arial,sans-serif;color:#F2F2F2;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#030303;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table width="640" cellpadding="0" cellspacing="0" style="background:#080808;border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 20px;text-align:center;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#B52A32;">HACKMITTEN 3.0 · REAL-TIME REGISTRATION ALERT</div>
+              <h1 style="font-size:24px;font-weight:700;color:#F2F2F2;margin:12px 0 6px;">New Team Registered!</h1>
+              <p style="font-size:14px;color:#A8A8A8;margin:0;">
+                Team <strong style="color:#FFFFFF;">${teamName}</strong> has just submitted their registration.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Summary Metric Badges -->
+          <tr>
+            <td style="padding:0 32px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="33%" style="padding:4px;">
+                    <div style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;text-align:center;">
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:#A8A8A8;">Total Teams</div>
+                      <div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-top:4px;">${data.totalTeams}</div>
+                    </div>
+                  </td>
+                  <td width="33%" style="padding:4px;">
+                    <div style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;text-align:center;">
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:#A8A8A8;">Registered Count</div>
+                      <div style="font-size:22px;font-weight:700;color:#D83A43;margin-top:4px;">${data.registeredCount}</div>
+                    </div>
+                  </td>
+                  <td width="33%" style="padding:4px;">
+                    <div style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px;text-align:center;">
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:#A8A8A8;">Category</div>
+                      <div style="font-size:16px;font-weight:700;color:#FFFFFF;margin-top:6px;">${degree}</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Details Table -->
+          <tr>
+            <td style="padding:0 32px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;width:140px;">Team Name</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-weight:600;font-size:13px;">${teamName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Category & Domain</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">
+                    <strong>${degree}</strong> · Domain: <span style="color:#D83A43;">${domainName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">College / Inst.</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">${college}</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Team Leader</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">
+                    ${leaderName} (${leaderEmail} · ${leaderPhone})
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Total Members</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">${data.memberCount} members</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;color:#888888;font-size:12px;">Team ID</td>
+                  <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;color:#D83A43;font-size:12px;">${teamId}</td>
+                </tr>
+              </table>
+
+              <div style="margin-top:24px;text-align:center;">
+                <a href="https://hackmitten-3-0.mitt.edu.in/admin/registrations" style="display:inline-block;background:#B52A32;color:#FFFFFF;text-decoration:none;font-size:12px;font-weight:600;padding:10px 24px;border-radius:20px;">
+                  View Team in Admin Dashboard →
+                </a>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:11px;color:#A8A8A8;margin:24px 0 0;opacity:0.6;">© 2026 Hackmitten · Automated Operations Monitor</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export async function sendNewTeamAdminAlertEmail(data: NewTeamAlertPayload): Promise<EmailResult> {
+  const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "sharathhn613@gmail.com";
+  return sendEmail({
+    to: adminEmail,
+    subject: `[HACKMITTEN 3.0] New Team Registered: ${data.teamName} (Total: ${data.totalTeams})`,
+    html: newTeamRegistrationAdminAlertHtml(data),
+    text: `HACKMITTEN 3.0 NEW TEAM REGISTRATION ALERT\n\nTeam: ${data.teamName}\nCategory: ${data.degree}\nDomain: ${data.domainName}\nCollege: ${data.college}\nLeader: ${data.leaderName} (${data.leaderEmail}, ${data.leaderPhone})\nMembers: ${data.memberCount}\nTeam ID: ${data.teamId}\n\nTotal Teams: ${data.totalTeams}\nRegistered Count: ${data.registeredCount}\n\nDashboard: https://hackmitten-3-0.mitt.edu.in/admin/registrations`,
+  });
+}
+
+

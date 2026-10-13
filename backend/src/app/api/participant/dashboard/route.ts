@@ -59,24 +59,50 @@ export async function GET() {
           ? "PG Dashboard"
           : "UG Dashboard";
 
-    // ─── Fetch Problem Statements assigned to this participant's category ───
-    const problemStatements = await db.problemStatement.findMany({
-      where: {
+    // ─── Check Problem Statement Release Status ───
+    const eventConfig = await db.eventConfig.findUnique({ where: { id: "singleton" } });
+    const releaseTimeIso = eventConfig?.problemStatementsReleaseTime || null;
+    const manuallyReleased = eventConfig?.problemStatementsReleased === true;
+
+    let isUnlocked = manuallyReleased;
+    if (!isUnlocked && releaseTimeIso) {
+      const releaseTimestamp = new Date(releaseTimeIso).getTime();
+      if (Number.isFinite(releaseTimestamp) && releaseTimestamp <= Date.now()) {
+        isUnlocked = true;
+      }
+    }
+
+    // ─── Fetch Problem Statements (Only for the team's selected domain & category) ───
+    let problemStatements: any[] = [];
+
+    if (isUnlocked) {
+      const psWhere: any = {
         isPublished: true,
         degrees: {
           has: category,
         },
-      },
-      include: {
-        domain: {
-          select: {
-            id: true,
-            name: true,
+      };
+
+      // Only display the domain that the team selected
+      if (team.domainId) {
+        psWhere.domainId = team.domainId;
+      } else if (team.domainName) {
+        psWhere.domain = { name: team.domainName };
+      }
+
+      problemStatements = await db.problemStatement.findMany({
+        where: psWhere,
+        include: {
+          domain: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-      orderBy: [{ createdAt: "desc" }],
-    });
+        orderBy: [{ createdAt: "desc" }],
+      });
+    }
 
     // ─── Fetch Domains assigned to this participant's category ───
     const domains = await db.domain.findMany({
@@ -93,6 +119,9 @@ export async function GET() {
       success: true,
       category,
       dashboardTitle,
+      isProblemStatementsLocked: !isUnlocked,
+      problemStatementsReleaseTime: releaseTimeIso,
+      selectedDomainName: team.domainName || team.domain?.name || null,
       team: {
         id: team.id,
         teamName: team.teamName,

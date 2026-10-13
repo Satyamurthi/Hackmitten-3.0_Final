@@ -12,6 +12,8 @@ export async function GET() {
       registrationLimit: config.registrationLimit,
       eventStartDate: config.eventStartDate,
       eventStartTime: config.eventStartTime,
+      problemStatementsReleaseTime: config.problemStatementsReleaseTime,
+      problemStatementsReleased: config.problemStatementsReleased,
     } });
   } catch (error) { return jsonError(error); }
 }
@@ -28,19 +30,30 @@ export async function PATCH(request: Request) {
     const limit = data.registrationLimit === undefined ? current.registrationLimit : data.registrationLimit;
     const startDate = data.eventStartDate === undefined ? current.eventStartDate : (data.eventStartDate as string | null);
     const startTime = data.eventStartTime === undefined ? current.eventStartTime : (data.eventStartTime as string | null);
+    const releaseTime = data.problemStatementsReleaseTime === undefined ? current.problemStatementsReleaseTime : (data.problemStatementsReleaseTime as string | null);
+    const released = data.problemStatementsReleased === undefined ? current.problemStatementsReleased : Boolean(data.problemStatementsReleased);
     
     if (typeof enabled !== "boolean" || !(limit === null || (typeof limit === "number" && Number.isSafeInteger(limit) && limit >= 1 && limit <= 1_000_000))) {
       return NextResponse.json({ error: "Registration enabled must be boolean and limit must be a positive integer or null" }, { status: 400 });
     }
     const updated = await db.eventConfig.update({ 
       where: { id: "singleton" }, 
-      data: { registrationEnabled: enabled, registrationLimit: limit, eventStartDate: startDate, eventStartTime: startTime } 
+      data: {
+        registrationEnabled: enabled,
+        registrationLimit: limit,
+        eventStartDate: startDate,
+        eventStartTime: startTime,
+        problemStatementsReleaseTime: releaseTime,
+        problemStatementsReleased: released,
+      } 
     });
     return NextResponse.json({ config: { 
       registrationEnabled: updated.registrationEnabled, 
       registrationLimit: updated.registrationLimit,
       eventStartDate: updated.eventStartDate,
       eventStartTime: updated.eventStartTime,
+      problemStatementsReleaseTime: updated.problemStatementsReleaseTime,
+      problemStatementsReleased: updated.problemStatementsReleased,
     } });
   } catch (error) { return jsonError(error); }
 }

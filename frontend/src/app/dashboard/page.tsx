@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -23,6 +23,10 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Lock,
+  Unlock,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 
 interface TeamMember {
@@ -58,6 +62,9 @@ interface DashboardData {
   success: boolean;
   category: "UG" | "PG" | "Diploma";
   dashboardTitle: string;
+  isProblemStatementsLocked: boolean;
+  problemStatementsReleaseTime: string | null;
+  selectedDomainName: string | null;
   team: {
     id: string;
     teamName: string;
@@ -80,6 +87,91 @@ interface DashboardData {
   domains: DomainItem[];
 }
 
+function ProblemStatementCountdown({
+  targetIso,
+  onExpire,
+}: {
+  targetIso: string | null;
+  onExpire?: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [hasExpired, setHasExpired] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setNow(Date.now());
+    if (!targetIso) return;
+
+    const interval = window.setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      const targetTime = new Date(targetIso).getTime();
+      if (Number.isFinite(targetTime) && targetTime <= current && !hasExpired) {
+        setHasExpired(true);
+        onExpire?.();
+      }
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [targetIso, hasExpired, onExpire]);
+
+  if (!targetIso) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-black/40 p-6 text-center">
+        <p className="mono text-xs uppercase tracking-widest text-[#A8A8A8]">
+          SCHEDULE ANNOUNCEMENT PENDING
+        </p>
+        <p className="text-xs text-[#777] mt-1.5">
+          The administrator will set the problem statement release countdown shortly.
+        </p>
+      </div>
+    );
+  }
+
+  const targetTime = new Date(targetIso).getTime();
+  const diff = Number.isFinite(targetTime) ? Math.max(0, targetTime - now) : 0;
+
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+
+  const units = [
+    { label: "DAYS", value: days },
+    { label: "HOURS", value: hours },
+    { label: "MINUTES", value: minutes },
+    { label: "SECONDS", value: seconds },
+  ];
+
+  return (
+    <div suppressHydrationWarning className="flex flex-col items-center">
+      <div className="flex items-center justify-center gap-2 sm:gap-4 md:gap-6">
+        {units.map((unit, index) => (
+          <div key={unit.label} className="flex items-center gap-2 sm:gap-4 md:gap-6">
+            <div className="flex flex-col items-center">
+              <div
+                suppressHydrationWarning
+                className="display min-w-[2.5ch] text-center text-3xl sm:text-5xl font-bold tabular-nums text-white"
+              >
+                {mounted ? String(unit.value).padStart(2, "0") : "--"}
+              </div>
+              <div className="mono mt-1 text-[9px] sm:text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                {unit.label}
+              </div>
+            </div>
+            {index < units.length - 1 && (
+              <span className="display -mt-3 sm:-mt-4 text-2xl sm:text-4xl text-[#B52A32] font-bold">
+                :
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ParticipantDashboardPage() {
   return (
     <RoleGate roles={["PARTICIPANT", "SUPER_ADMIN"]}>
@@ -93,30 +185,36 @@ function DashboardContent() {
   const { data: session } = useSession();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedPsId, setExpandedPsId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchDashboard() {
-      try {
+  const fetchDashboard = useCallback(async (isSilent = false) => {
+    try {
+      if (isSilent) {
+        setIsRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
-        const res = await fetch("/api/participant/dashboard");
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || "Failed to load dashboard data");
-        }
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error fetching dashboard");
-      } finally {
-        setLoading(false);
       }
+      setError(null);
+      const res = await fetch("/api/participant/dashboard", { cache: "no-store" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to load dashboard data");
+      }
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error fetching dashboard");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
-
-    fetchDashboard();
   }, []);
+
+  useEffect(() => {
+    fetchDashboard(false);
+  }, [fetchDashboard]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/login?role=PARTICIPANT" });
@@ -448,94 +546,181 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* ─── CATEGORY PROBLEM STATEMENTS SECTION ─── */}
-        <div className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
-            <div>
+        {/* ─── PROBLEM STATEMENTS SECTION (LOCKED VS UNLOCKED) ─── */}
+        {data.isProblemStatementsLocked ? (
+          <div className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-[#B52A32]/10 blur-3xl pointer-events-none rounded-full" />
+            
+            <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
               <div className="flex items-center gap-2.5">
-                <FileText size={18} className="text-[#B52A32]" />
+                <Lock size={18} className="text-[#D83A43]" />
                 <h3 className="display text-xl font-bold text-white">
-                  Problem Statements — {category} Category
+                  Problem Statements Locked
                 </h3>
               </div>
-              <p className="text-xs text-[#A8A8A8] mt-1">
-                Problem statements specifically designated for <strong className="text-white">{category}</strong> participants.
-              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchDashboard(true)}
+                  disabled={isRefreshing}
+                  className="mono text-xs px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  title="Check if problem statements were unlocked"
+                >
+                  <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} />
+                  {isRefreshing ? "Checking…" : "Check Status"}
+                </button>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${categoryBadgeColor}`}>
+                  {category} Track
+                </span>
+              </div>
             </div>
-            <span className="mono text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80">
-              {problemStatements.length} Statement{problemStatements.length === 1 ? "" : "s"} Available
-            </span>
+
+            <div className="py-6 sm:py-8 text-center space-y-6">
+              <div className="space-y-2">
+                <div className="mono text-xs uppercase tracking-widest text-[#B52A32]">
+                  / Track: {data.selectedDomainName || team.domainName || "Assigned Domain"}
+                </div>
+                <h4 className="display text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                  Problem Statements Unlock Countdown
+                </h4>
+                <p className="text-xs sm:text-sm text-[#A8A8A8] max-w-xl mx-auto leading-relaxed">
+                  Problem statements for your registered domain (
+                  <strong className="text-white">
+                    {data.selectedDomainName || team.domainName || "Selected Track"}
+                  </strong>
+                  ) will be unlocked and revealed automatically when the timer reaches zero.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-[#121212] p-6 sm:p-8 inline-block min-w-[280px] sm:min-w-[460px] shadow-inner">
+                <ProblemStatementCountdown
+                  targetIso={data.problemStatementsReleaseTime}
+                  onExpire={() => fetchDashboard(true)}
+                />
+              </div>
+
+              {data.problemStatementsReleaseTime && (
+                <p className="mono text-[11px] text-[#A8A8A8]">
+                  Scheduled Release:{" "}
+                  <span className="text-white">
+                    {new Date(data.problemStatementsReleaseTime).toLocaleString("en-IN", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
-
-          {problemStatements.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/15 p-8 text-center bg-[#121212]/50">
-              <FileText size={32} className="text-[#A8A8A8] mx-auto mb-2 opacity-50" />
-              <h4 className="text-sm font-semibold text-white">No problem statements released yet for {category}</h4>
-              <p className="text-xs text-[#A8A8A8] mt-1 max-w-md mx-auto">
-                Problem statements for the {category} category will be unlocked by the admin according to the hackathon event schedule. Please check back soon.
-              </p>
+        ) : (
+          <div className="rounded-2xl border border-emerald-500/30 bg-[#0A0A0A] p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-3xl pointer-events-none rounded-full" />
+            <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <FileText size={18} className="text-emerald-400" />
+                  <h3 className="display text-xl font-bold text-white">
+                    Problem Statements — {data.selectedDomainName || team.domainName || category} Track
+                  </h3>
+                </div>
+                <p className="text-xs text-[#A8A8A8] mt-1">
+                  Statements for your selected track:{" "}
+                  <strong className="text-emerald-400">
+                    {data.selectedDomainName || team.domainName || "Registered Track"}
+                  </strong>{" "}
+                  ({category} Category).
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="mono text-xs px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <Unlock size={12} /> Unlocked
+                </span>
+                <span className="mono text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/80">
+                  {problemStatements.length} Statement{problemStatements.length === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {problemStatements.map((ps) => {
-                const isExpanded = expandedPsId === ps.id;
-                return (
-                  <div
-                    key={ps.id}
-                    className="rounded-xl border border-white/10 bg-[#121212] transition-all hover:border-white/20"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedPsId(isExpanded ? null : ps.id)}
-                      className="w-full p-4 sm:p-5 text-left flex items-start justify-between gap-4"
-                    >
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {ps.domain && (
-                            <span className="mono text-[10px] uppercase font-bold text-[#D83A43] bg-[#B52A32]/10 border border-[#B52A32]/30 px-2 py-0.5 rounded">
-                              {ps.domain.name}
-                            </span>
-                          )}
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${categoryBadgeColor}`}>
-                            {category} Eligible
-                          </span>
-                        </div>
-                        <h4 className="display text-base sm:text-lg font-bold text-white tracking-tight">
-                          {ps.title}
-                        </h4>
-                        {!isExpanded && (
-                          <p className="text-xs text-[#A8A8A8] line-clamp-2">
-                            {ps.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="p-1 text-[#A8A8A8] shrink-0">
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </div>
-                    </button>
 
-                    {isExpanded && (
-                      <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-white/5 space-y-4">
-                        <div>
-                          <span className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">
-                            Problem Description & Scope
-                          </span>
-                          <div className="mt-2 text-xs sm:text-sm text-[#CCCCCC] leading-relaxed whitespace-pre-wrap rounded-lg bg-black/40 p-4 border border-white/5">
-                            {ps.description}
+            {problemStatements.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/15 p-8 text-center bg-[#121212]/50">
+                <FileText size={32} className="text-[#A8A8A8] mx-auto mb-2 opacity-50" />
+                <h4 className="text-sm font-semibold text-white">
+                  No problem statements released yet for {data.selectedDomainName || team.domainName || category}
+                </h4>
+                <p className="text-xs text-[#A8A8A8] mt-1 max-w-md mx-auto">
+                  The organizing committee will publish problem statements for your selected domain shortly. Please stay tuned.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {problemStatements.map((ps) => {
+                  const isExpanded = expandedPsId === ps.id || problemStatements.length === 1;
+                  return (
+                    <div
+                      key={ps.id}
+                      className="rounded-xl border border-white/10 bg-[#121212] transition-all hover:border-emerald-500/40 overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPsId(isExpanded ? null : ps.id)}
+                        className="w-full p-4 sm:p-5 text-left flex items-start justify-between gap-4"
+                      >
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {ps.domain && (
+                              <span className="mono text-[10px] uppercase font-bold text-[#D83A43] bg-[#B52A32]/10 border border-[#B52A32]/30 px-2 py-0.5 rounded">
+                                {ps.domain.name} Track
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${categoryBadgeColor}`}>
+                              {category} Eligible
+                            </span>
+                          </div>
+                          <h4 className="display text-base sm:text-lg font-bold text-white tracking-tight">
+                            {ps.title}
+                          </h4>
+                          {!isExpanded && ps.description && (
+                            <p className="text-xs text-[#A8A8A8] line-clamp-2">
+                              {ps.description.replace(/<[^>]+>/g, " ")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="p-1 text-[#A8A8A8] shrink-0">
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 sm:px-5 pb-5 pt-3 border-t border-white/5 space-y-4">
+                          <div>
+                            <span className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">
+                              Problem Description & Scope
+                            </span>
+                            <div className="mt-2 text-xs sm:text-sm text-[#E0E0E0] leading-relaxed rounded-lg bg-black/50 p-4 sm:p-5 border border-white/5 overflow-x-auto">
+                              {ps.description?.includes("<") ? (
+                                <div
+                                  className="prose prose-invert prose-sm sm:prose-base max-w-none [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:bg-black/70 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-white/10 [&_code]:text-emerald-400 [&_blockquote]:border-l-2 [&_blockquote]:border-[#B52A32] [&_blockquote]:pl-3 [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_a]:text-[#D83A43] [&_a]:underline"
+                                  dangerouslySetInnerHTML={{ __html: ps.description }}
+                                />
+                              ) : (
+                                <div className="whitespace-pre-wrap">{ps.description}</div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-[#A8A8A8] pt-2 border-t border-white/5">
+                            <span className="mono text-[10px]">Applicable Categories: {ps.degrees.join(", ")}</span>
+                            <span className="mono text-[10px]">Track: {data.selectedDomainName || team.domainName || "Assigned"}</span>
                           </div>
                         </div>
-
-                        <div className="flex items-center justify-between text-xs text-[#A8A8A8] pt-2">
-                          <span className="mono text-[10px]">Applicable Categories: {ps.degrees.join(", ")}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ─── COMPETITION DOMAINS AVAILABLE FOR THIS CATEGORY ─── */}
         <div className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8 space-y-6">

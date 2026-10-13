@@ -9,6 +9,7 @@ import { deletePrivateFile, storeParticipantImage, UploadError } from "@/lib/upl
 import { createRegistrationAccessToken, hashRegistrationAccessToken, registrationAccessCookieName, REGISTRATION_ACCESS_COOKIE_MAX_AGE_SECONDS } from "@/lib/registration-access";
 import { generateQrToken } from "@/lib/constants";
 import bcrypt from "bcryptjs";
+import { sendNewTeamAdminAlertEmail } from "@/lib/email";
 
 type RawQueryClient = Pick<typeof db, "$queryRaw">;
 
@@ -243,6 +244,36 @@ export async function POST(req: Request) {
         },
       }).catch((e) => console.warn("[registrations] leader user upsert non-blocking error:", e));
     }
+
+    // ─── Real-Time Admin Notification Email with Total & Registered Counts ───
+    (async () => {
+      try {
+        const [totalTeams, registeredCount] = await Promise.all([
+          db.team.count(),
+          db.team.count({
+            where: {
+              status: { in: ["SUBMITTED", "PAYMENT_PENDING", "PAYMENT_VERIFIED", "APPROVED"] },
+            },
+          }),
+        ]);
+        const leaderMember = team.members.find((m) => m.isLeader) || team.members[0];
+        await sendNewTeamAdminAlertEmail({
+          teamName: team.teamName,
+          college: team.college,
+          degree: team.degree,
+          domainName: team.domainName,
+          leaderName: leaderMember?.fullName || "Team Leader",
+          leaderEmail: leaderMember?.email || "N/A",
+          leaderPhone: leaderMember?.phone || "N/A",
+          memberCount: team.members.length,
+          teamId: team.id,
+          totalTeams,
+          registeredCount,
+        });
+      } catch (adminMailErr) {
+        console.warn("[registrations] admin new team notification non-blocking error:", adminMailErr);
+      }
+    })().catch(() => {});
 
     const {
       registrationAccessTokenHash: _registrationAccessTokenHash,

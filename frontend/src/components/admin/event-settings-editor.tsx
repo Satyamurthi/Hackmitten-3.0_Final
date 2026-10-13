@@ -23,6 +23,8 @@ type Config = {
   registrationLimit: number | null;
   eventStartDate?: string | null;
   eventStartTime?: string | null;
+  problemStatementsReleaseTime?: string | null;
+  problemStatementsReleased?: boolean;
 };
 
 export interface DomainItem {
@@ -71,6 +73,8 @@ export function EventSettingsEditor() {
     registrationLimit: null,
     eventStartDate: null,
     eventStartTime: null,
+    problemStatementsReleaseTime: null,
+    problemStatementsReleased: false,
   };
 
   const [savingConfig, setSavingConfig] = useState(false);
@@ -89,6 +93,8 @@ export function EventSettingsEditor() {
           ...form,
           eventStartDate: form.eventStartDate || null,
           eventStartTime: form.eventStartTime || null,
+          problemStatementsReleaseTime: form.problemStatementsReleaseTime || null,
+          problemStatementsReleased: Boolean(form.problemStatementsReleased),
         }),
       });
       const result = await response.json();
@@ -96,6 +102,7 @@ export function EventSettingsEditor() {
       setDraft(result.config);
       setSavedConfig(true);
       await queryClient.invalidateQueries({ queryKey: ["event-state"] });
+      await queryClient.invalidateQueries({ queryKey: ["config"] });
     } catch (cause) {
       setConfigError(cause instanceof Error ? cause.message : "Save failed");
     } finally {
@@ -533,6 +540,60 @@ export function EventSettingsEditor() {
                 />
                 <span className="mt-1 block text-xs text-[#A8A8A8]">Leave blank for no limit.</span>
               </label>
+
+              {/* Problem Statements Release Schedule & Countdown */}
+              <div className="rounded-lg border border-white/10 bg-[#080808] p-4 space-y-4">
+                <div>
+                  <span className="block font-medium text-white text-sm">
+                    Problem Statements Release Timer
+                  </span>
+                  <span className="text-xs text-[#A8A8A8]">
+                    Set the exact date & time when problem statements will automatically unlock on participant dashboards. Participants see a live countdown timer until this moment.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+                      Release Date & Time
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={form.problemStatementsReleaseTime ? form.problemStatementsReleaseTime.slice(0, 16) : ""}
+                      onChange={(e) =>
+                        setDraft({
+                          ...form,
+                          problemStatementsReleaseTime: e.target.value ? new Date(e.target.value).toISOString() : null,
+                        })
+                      }
+                      className="mt-1 w-full rounded border border-white/10 bg-[#121212] px-3 py-2 text-sm text-white focus:border-[#B52A32] focus:outline-none"
+                    />
+                    <span className="mt-1 block text-[11px] text-[#A8A8A8]">
+                      {form.problemStatementsReleaseTime
+                        ? `Scheduled: ${new Date(form.problemStatementsReleaseTime).toLocaleString()}`
+                        : "No release time set (locked until unlocked)."}
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-4 rounded border border-white/10 bg-[#121212] p-3.5 self-start cursor-pointer">
+                    <span>
+                      <span className="block text-xs font-semibold text-white">Unlock Problem Statements Now</span>
+                      <span className="text-[10px] text-[#A8A8A8]">Immediate override to reveal questions to participants.</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.problemStatementsReleased)}
+                      onChange={(e) =>
+                        setDraft({
+                          ...form,
+                          problemStatementsReleased: e.target.checked,
+                        })
+                      }
+                      className="h-5 w-5 accent-[#B52A32]"
+                    />
+                  </label>
+                </div>
+              </div>
 
               {configError && (
                 <p role="alert" className="text-sm text-red-400">

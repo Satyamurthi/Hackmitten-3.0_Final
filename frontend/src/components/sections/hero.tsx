@@ -33,7 +33,7 @@ export function Hero() {
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#030303] pointer-events-none" />
 
       {/* Side College Logos: Left (MITT) & Right (10 Years of Excellence) */}
-      <div className="pointer-events-none absolute inset-x-0 top-14 sm:top-16 md:top-18 z-20 px-4 sm:px-8 md:px-12 lg:px-16 flex items-center justify-between">
+      <div className="pointer-events-none absolute inset-x-0 top-14 sm:top-16 md:top-20 z-20 px-4 sm:px-8 md:px-12 lg:px-16 flex items-center justify-between">
         <div className="pointer-events-auto">
           <a
             href="https://mitt.edu.in/"
@@ -45,7 +45,7 @@ export function Hero() {
             <img
               src="/images/college_logo/MITT_LOGO.jpeg"
               alt="MITT Logo"
-              className="h-14 w-14 sm:h-[72px] sm:w-[72px] md:h-[88px] md:w-[88px] lg:h-[104px] lg:w-[104px] rounded-full object-contain ring-1 ring-white/20 bg-white/5 p-1 backdrop-blur-sm shadow-[0_0_28px_rgba(255,255,255,0.09)]"
+              className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-[112px] lg:w-[112px] xl:h-[124px] xl:w-[124px] rounded-full object-contain ring-2 ring-white/25 bg-white/10 p-1.5 backdrop-blur-md shadow-[0_0_36px_rgba(255,255,255,0.15)]"
             />
           </a>
         </div>
@@ -60,7 +60,7 @@ export function Hero() {
             <img
               src="/images/college_logo/Ten_Year_Excellence.jpeg"
               alt="10 Years of Excellence"
-              className="h-14 w-14 sm:h-[72px] sm:w-[72px] md:h-[88px] md:w-[88px] lg:h-[104px] lg:w-[104px] rounded-full object-contain ring-1 ring-white/20 bg-black/40 p-1 backdrop-blur-sm shadow-[0_0_28px_rgba(216,58,67,0.19)]"
+              className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-[112px] lg:w-[112px] xl:h-[124px] xl:w-[124px] rounded-full object-contain ring-2 ring-[#B52A32]/40 bg-black/60 p-1.5 backdrop-blur-md shadow-[0_0_36px_rgba(216,58,67,0.3)]"
             />
           </a>
         </div>

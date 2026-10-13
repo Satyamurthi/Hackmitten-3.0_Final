@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -18,7 +18,11 @@ import {
   X,
   Layers,
   GraduationCap,
+  Clock,
+  Lock,
+  Unlock,
 } from "lucide-react";
+import { QuillEditor } from "./quill-editor";
 
 export interface ProblemStatementItem {
   id: string;
@@ -74,6 +78,56 @@ export function ProblemStatementsManager() {
     queryKey: ["admin-domains"],
     queryFn: () => request("/api/admin/domains"),
   });
+
+  // Config query for problem statement release schedule
+  const { data: configData, refetch: refetchConfig } = useQuery<{
+    config: {
+      problemStatementsReleaseTime?: string | null;
+      problemStatementsReleased?: boolean;
+    };
+  }>({
+    queryKey: ["admin-config-release"],
+    queryFn: () => request("/api/admin/config"),
+  });
+
+  const releaseTime = configData?.config?.problemStatementsReleaseTime || "";
+  const isManuallyReleased = configData?.config?.problemStatementsReleased === true;
+  const [scheduleTimeInput, setScheduleTimeInput] = useState("");
+  const [updatingRelease, setUpdatingRelease] = useState(false);
+
+  useEffect(() => {
+    if (configData?.config?.problemStatementsReleaseTime) {
+      setScheduleTimeInput(configData.config.problemStatementsReleaseTime.slice(0, 16));
+    }
+  }, [configData?.config?.problemStatementsReleaseTime]);
+
+  const handleUpdateRelease = async (timeVal: string | null, manualVal: boolean) => {
+    setUpdatingRelease(true);
+    setActionError(null);
+    setSuccessMessage(null);
+    try {
+      await request("/api/admin/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          problemStatementsReleaseTime: timeVal ? new Date(timeVal).toISOString() : null,
+          problemStatementsReleased: manualVal,
+        }),
+      });
+      await refetchConfig();
+      setSuccessMessage(
+        manualVal
+          ? "Problem statements are now unlocked immediately and visible on participant dashboards!"
+          : timeVal
+          ? `Problem statements will unlock on schedule: ${new Date(timeVal).toLocaleString()}`
+          : "Release schedule cleared."
+      );
+    } catch (err: any) {
+      setActionError(err.message || "Failed to update release settings.");
+    } finally {
+      setUpdatingRelease(false);
+    }
+  };
 
   // State
   const [selectedDegree, setSelectedDegree] = useState<string>("ALL");
@@ -299,6 +353,87 @@ export function ProblemStatementsManager() {
         </div>
       )}
 
+      {/* ─── Problem Statement Release Schedule (Timer & Direct Unlock) ─── */}
+      <div className="rounded-xl border border-white/10 bg-[#0e0e0e] p-4 sm:p-5 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2.5">
+            <Clock size={18} className="text-[#B52A32] shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                Problem Statement Release Schedule
+                {isManuallyReleased ? (
+                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-normal">
+                    Unlocked Now (Visible to Participants)
+                  </span>
+                ) : releaseTime ? (
+                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-normal">
+                    Scheduled: {new Date(releaseTime).toLocaleString()}
+                  </span>
+                ) : (
+                  <span className="mono text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-[#A8A8A8] border border-white/10 font-normal">
+                    Locked (No Timer Set)
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-[#A8A8A8] mt-0.5">
+                Participants see a live countdown timer until this moment. Problem statements will only display on participant dashboards after this countdown expires or if unlocked.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={updatingRelease}
+              onClick={() => handleUpdateRelease(releaseTime || null, !isManuallyReleased)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                isManuallyReleased
+                  ? "bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20"
+              }`}
+            >
+              {isManuallyReleased ? <Lock size={12} /> : <Unlock size={12} />}
+              {isManuallyReleased ? "Lock Problem Statements" : "Unlock Immediately"}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-1">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="mono text-[11px] text-[#A8A8A8] uppercase tracking-wider shrink-0">
+              Set Release Time:
+            </span>
+            <input
+              type="datetime-local"
+              value={scheduleTimeInput}
+              onChange={(e) => setScheduleTimeInput(e.target.value)}
+              className="rounded-lg border border-white/10 bg-[#161616] px-3 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={updatingRelease || !scheduleTimeInput}
+            onClick={() => handleUpdateRelease(scheduleTimeInput, false)}
+            className="rounded-lg bg-[#B52A32] hover:bg-[#D83A43] text-white px-3.5 py-1.5 text-xs font-semibold transition-all disabled:opacity-40"
+          >
+            Save Release Timer
+          </button>
+          {releaseTime && (
+            <button
+              type="button"
+              disabled={updatingRelease}
+              onClick={() => {
+                setScheduleTimeInput("");
+                handleUpdateRelease(null, false);
+              }}
+              className="text-xs text-[#A8A8A8] hover:text-white underline ml-1"
+            >
+              Clear Timer
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Filter & Control Bar */}
       <div className="rounded-xl border border-white/5 bg-[#080808] p-4 space-y-4">
         {/* Category Filter Pills */}
@@ -516,9 +651,16 @@ export function ProblemStatementsManager() {
                   <h3 className="text-lg font-bold text-white tracking-tight">{item.title}</h3>
 
                   {/* Description */}
-                  <p className="text-sm text-[#A8A8A8] whitespace-pre-line leading-relaxed">
-                    {item.description}
-                  </p>
+                  {item.description?.includes("<") ? (
+                    <div
+                      className="text-sm text-[#CCCCCC] leading-relaxed prose prose-invert prose-sm max-w-none [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:bg-black/50 [&_pre]:p-2 [&_pre]:rounded [&_blockquote]:border-l-2 [&_blockquote]:border-[#B52A32] [&_blockquote]:pl-3"
+                      dangerouslySetInnerHTML={{ __html: item.description }}
+                    />
+                  ) : (
+                    <p className="text-sm text-[#A8A8A8] whitespace-pre-line leading-relaxed">
+                      {item.description}
+                    </p>
+                  )}
 
                   {/* Timestamps */}
                   <div className="mono text-[11px] text-[#666] pt-1">
@@ -691,21 +833,19 @@ export function ProblemStatementsManager() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-medium text-white/90 mb-1.5">
-                  Problem Description & Requirements <span className="text-[#B52A32]">*</span>
-                </label>
-                <textarea
-                  required
-                  rows={6}
-                  placeholder="Describe the problem background, objective, expected deliverables, evaluation criteria, and constraints..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-[#141414] px-4 py-3 text-sm text-white placeholder-[#555] focus:border-[#B52A32] focus:outline-none resize-y"
-                />
-                <div className="flex justify-between items-center text-[11px] text-[#666] mt-1">
-                  <span>Markdown formatting supported.</span>
-                  <span>{description.length} characters</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-white/90">
+                    Problem Description & Requirements (Rich Text) <span className="text-[#B52A32]">*</span>
+                  </label>
+                  <span className="mono text-[10px] text-[#A8A8A8]">
+                    Styled via Quill Editor
+                  </span>
                 </div>
+                <QuillEditor
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Describe the problem background, objective, expected deliverables, evaluation criteria, and constraints with styles, lists, and code blocks..."
+                />
               </div>
 
               {/* Publish immediately toggle */}
