@@ -58,6 +58,19 @@ export async function verifyPasswordAndRole({
   return roleMatchesSelectedRole(selectedRole, user.role);
 }
 
+/**
+ * Generates a simple, human-friendly password:
+ * Starting 4 letters of leader's name + 4 random digits (e.g., "jasi4829")
+ */
+export function generateSimpleParticipantPassword(leaderName?: string | null): string {
+  const cleanName = (leaderName || "hack")
+    .replace(/[^a-zA-Z]/g, "")
+    .toLowerCase();
+  const prefix = (cleanName.slice(0, 4) || "team").padEnd(4, "x");
+  const randomDigits = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}${randomDigits}`;
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 }, // 7 days
   pages: {
@@ -77,14 +90,29 @@ export const authOptions: NextAuthOptions = {
         const id = normalizeLoginIdentifier(String(credentials.identifier));
         const selectedRole = String(credentials.role);
 
-        // ─── Participant Authentication (Leader Email + Team ID) ───
+        // ─── Participant Authentication (Leader Email/Username + Simple Password / Team ID) ───
         if (selectedRole.trim().toUpperCase() === "PARTICIPANT") {
           const email = id.toLowerCase();
           const rawPassword = String(credentials.password).trim();
 
+          // 1. Look up User record by email or username (allows updated username/email)
+          const user = await db.user.findFirst({
+            where: {
+              OR: [
+                { email: email },
+                { username: { equals: email, mode: "insensitive" } },
+              ],
+              role: "PARTICIPANT",
+            },
+          });
+
+          // 2. Look up Leader Participant record
           const leader = await db.participant.findFirst({
             where: {
-              email,
+              OR: [
+                { email: user?.email || email },
+                { email: email },
+              ],
               isLeader: true,
             },
             include: {
@@ -94,31 +122,43 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!leader || !leader.team) {
-            console.warn("[auth] participant login: leader not found for email:", email);
+            console.warn("[auth] participant login: leader not found for identifier:", email);
             return null;
           }
 
           const team = leader.team;
-          const isMatch =
-            rawPassword.toLowerCase() === team.id.toLowerCase() ||
-            (Boolean(team.registrationId) && rawPassword.toLowerCase() === team.registrationId!.toLowerCase());
+
+          // 3. Password Verification:
+          // Check bcrypt user passwordHash (if set), team.participantPassword, or team.id / registrationId
+          let isMatch = false;
+          if (user?.passwordHash) {
+            isMatch = await bcrypt.compare(rawPassword, user.passwordHash);
+          }
+          if (!isMatch && team.participantPassword) {
+            isMatch = rawPassword.toLowerCase() === team.participantPassword.toLowerCase();
+          }
+          if (!isMatch) {
+            isMatch =
+              rawPassword.toLowerCase() === team.id.toLowerCase() ||
+              (Boolean(team.registrationId) && rawPassword.toLowerCase() === team.registrationId!.toLowerCase());
+          }
 
           if (!isMatch) {
-            console.warn("[auth] participant login: password does not match team ID or registration ID");
+            console.warn("[auth] participant login: invalid password for team:", team.teamName);
             return null;
           }
 
-          const passwordHash = await bcrypt.hash(rawPassword, 10);
-          const user = await db.user.upsert({
-            where: { email },
+          const passwordHash = user?.passwordHash || (await bcrypt.hash(rawPassword, 10));
+          const syncedUser = await db.user.upsert({
+            where: { email: leader.email.toLowerCase() },
             update: {
               role: "PARTICIPANT",
               passwordHash,
               name: leader.fullName,
             },
             create: {
-              email,
-              username: email,
+              email: leader.email.toLowerCase(),
+              username: leader.email.toLowerCase(),
               name: leader.fullName,
               role: "PARTICIPANT",
               passwordHash,
@@ -126,11 +166,11 @@ export const authOptions: NextAuthOptions = {
           });
 
           return {
-            id: user.id,
-            email: user.email,
-            name: leader.fullName || user.name || "Team Leader",
-            role: user.role,
-            sessionVersion: user.updatedAt.getTime(),
+            id: syncedUser.id,
+            email: syncedUser.email,
+            name: leader.fullName || syncedUser.name || "Team Leader",
+            role: syncedUser.role,
+            sessionVersion: syncedUser.updatedAt.getTime(),
             teamId: team.id,
             degree: team.degree,
           };

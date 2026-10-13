@@ -39,10 +39,14 @@ export function registrationAcknowledgementEmailHtml(opts: {
   leaderName: string;
   teamName: string;
   contactEmail?: string | null;
+  username?: string | null;
+  password?: string | null;
 }): string {
   const leaderName = escapeHtml(opts.leaderName);
   const teamName = escapeHtml(opts.teamName);
   const contactEmail = opts.contactEmail ? escapeHtml(opts.contactEmail) : null;
+  const username = opts.username ? escapeHtml(opts.username) : null;
+  const password = opts.password ? escapeHtml(opts.password) : null;
 
   return `
 <!DOCTYPE html>
@@ -70,6 +74,38 @@ export function registrationAcknowledgementEmailHtml(opts: {
                 <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;">TEAM</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;">${teamName}</td></tr>
                 <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">REGISTRATION STATUS</td><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:16px;color:#B52A32;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">RECEIVED</td></tr>
               </table>
+
+              ${
+                username && password
+                  ? `
+              <!-- Credentials Card -->
+              <div style="background:#151515;border:1px solid rgba(216,58,67,0.3);border-radius:10px;padding:20px;margin:24px 0;">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#D83A43;font-weight:700;">
+                  YOUR PARTICIPANT PORTAL LOGIN CREDENTIALS
+                </div>
+                <p style="font-size:12px;color:#A8A8A8;margin:6px 0 14px;">
+                  Use these credentials to log in to your participant dashboard to track payment review, select problem statements, and access passes.
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                  <tr>
+                    <td style="padding:10px 14px;color:#888888;font-size:12px;width:120px;">Username (Email):</td>
+                    <td style="padding:10px 14px;color:#FFFFFF;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;">${username}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);color:#888888;font-size:12px;">Login Password:</td>
+                    <td style="padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);color:#D83A43;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;">${password}</td>
+                  </tr>
+                </table>
+                <div style="margin-top:16px;text-align:center;">
+                  <a href="https://hackmitten-3-0.mitt.edu.in/login?role=PARTICIPANT" style="display:inline-block;background:#B52A32;color:#FFFFFF;font-size:12px;font-weight:600;padding:10px 24px;border-radius:20px;text-decoration:none;">
+                    Sign In to Participant Dashboard →
+                  </a>
+                </div>
+              </div>
+              `
+                  : ""
+              }
+
               <p style="margin:0 0 12px;">Your registration is awaiting admin review. Your registration and payment details will be reviewed by the Hackmitten coordinators.</p>
               <p style="margin:0 0 8px;color:#F2F2F2;font-weight:600;">Please note:</p>
               <ul style="margin:0 0 20px;padding-left:20px;">
@@ -96,6 +132,8 @@ export function registrationAcknowledgementEmailText(opts: {
   leaderName: string;
   teamName: string;
   contactEmail?: string | null;
+  username?: string | null;
+  password?: string | null;
 }): string {
   return `HACKMITTEN 3.0
 
@@ -107,7 +145,16 @@ Your team registration for Hackmitten 3.0 has been successfully received.
 
 Team: ${opts.teamName}
 Registration status: RECEIVED
-
+${
+  opts.username && opts.password
+    ? `
+PARTICIPANT PORTAL LOGIN CREDENTIALS:
+- Username: ${opts.username}
+- Password: ${opts.password}
+- Login URL: https://hackmitten-3-0.mitt.edu.in/login?role=PARTICIPANT
+`
+    : ""
+}
 Your registration is awaiting admin review. Your registration and payment details will be reviewed by the Hackmitten coordinators.
 
 Please note:
@@ -126,6 +173,8 @@ export async function sendRegistrationAcknowledgementEmail(opts: {
   leaderName: string;
   teamName: string;
   contactEmail?: string | null;
+  username?: string | null;
+  password?: string | null;
 }): Promise<EmailResult> {
   return sendEmail({
     to: opts.to,
@@ -567,6 +616,7 @@ export interface NewTeamAlertPayload {
   memberCount: number;
   members?: TeamMemberAlertItem[];
   teamId: string;
+  password?: string | null;
   totalTeams: number;
   registeredCount: number;
 }
@@ -580,6 +630,7 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
   const leaderEmail = escapeHtml(data.leaderEmail);
   const leaderPhone = escapeHtml(data.leaderPhone);
   const teamId = escapeHtml(data.teamId);
+  const teamPassword = escapeHtml(data.password || "N/A");
 
   const membersRows = (data.members || []).map((m, idx) => {
     const isLeader = m.isLeader || idx === 0;
@@ -680,8 +731,12 @@ export function newTeamRegistrationAdminAlertHtml(data: NewTeamAlertPayload): st
                   <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#FFFFFF;font-size:13px;">${data.memberCount} members</td>
                 </tr>
                 <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);color:#888888;font-size:12px;">Team Password</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:'JetBrains Mono',monospace;color:#D83A43;font-size:13px;font-weight:700;">${teamPassword}</td>
+                </tr>
+                <tr>
                   <td style="padding:12px 16px;color:#888888;font-size:12px;">Team ID</td>
-                  <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;color:#D83A43;font-size:12px;">${teamId}</td>
+                  <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;color:#AAAAAA;font-size:11px;">${teamId}</td>
                 </tr>
               </table>
             </td>

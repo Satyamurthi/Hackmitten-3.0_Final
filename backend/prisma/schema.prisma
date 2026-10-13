@@ -109,6 +109,9 @@ model Team {
   registrationAcknowledgementSentAt       DateTime?
   approvalEmailSentAt                     DateTime?
   rejectionEmailSentAt                    DateTime?
+  participantPassword                     String?
+  acceptedProblemStatementId             String?
+  acceptedProblemStatement               ProblemStatement?  @relation("TeamAcceptedProblemStatement", fields: [acceptedProblemStatementId], references: [id], onDelete: SetNull)
   createdAt                               DateTime           @default(now())
   updatedAt                               DateTime           @updatedAt
 
@@ -120,6 +123,7 @@ model Team {
   @@index([degree])
   @@index([domainId])
   @@index([registrationId])
+  @@index([acceptedProblemStatementId])
 }
 
 model Domain {
@@ -138,15 +142,17 @@ model Domain {
 }
 
 model ProblemStatement {
-  id          String   @id @default(cuid())
-  title       String
-  description String   @db.Text
-  degrees     String[] // ["Diploma"], ["UG"], ["PG"]
-  domainId    String?
-  domain      Domain?  @relation(fields: [domainId], references: [id], onDelete: SetNull)
-  isPublished Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  title           String
+  description     String   @db.Text
+  degrees         String[] // ["Diploma"], ["UG"], ["PG"]
+  domainId        String?
+  domain          Domain?  @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  acceptedByTeams Team[]   @relation("TeamAcceptedProblemStatement")
 
   @@index([isPublished])
   @@index([domainId])

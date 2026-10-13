@@ -10,6 +10,7 @@ import { createRegistrationAccessToken, hashRegistrationAccessToken, registratio
 import { generateQrToken } from "@/lib/constants";
 import bcrypt from "bcryptjs";
 import { sendNewTeamAdminAlertEmail } from "@/lib/email";
+import { generateSimpleParticipantPassword } from "@/lib/auth";
 
 type RawQueryClient = Pick<typeof db, "$queryRaw">;
 
@@ -221,13 +222,19 @@ export async function POST(req: Request) {
       throw error;
     }
 
-    const acknowledgementEmailSent = await attemptRegistrationAcknowledgement(team.id);
-
-    // ─── Generate Participant Login Account (Leader Email + Team ID) ───
+    // ─── Generate Simple Participant Login Password (Leader starting 4 letters + 4 digits) ───
     const leader = team.members.find((m) => m.isLeader) || team.members[0];
+    const generatedPassword = generateSimpleParticipantPassword(leader?.fullName);
+
+    // Save simple password on Team record
+    await db.team.update({
+      where: { id: team.id },
+      data: { participantPassword: generatedPassword },
+    });
+
     if (leader) {
       const leaderEmail = leader.email.toLowerCase().trim();
-      const passwordHash = await bcrypt.hash(team.id, 10);
+      const passwordHash = await bcrypt.hash(generatedPassword, 10);
       await db.user.upsert({
         where: { email: leaderEmail },
         update: {
@@ -244,6 +251,9 @@ export async function POST(req: Request) {
         },
       }).catch((e) => console.warn("[registrations] leader user upsert non-blocking error:", e));
     }
+
+    // ─── Send Acknowledgement Email with Login Credentials to Team Members ───
+    const acknowledgementEmailSent = await attemptRegistrationAcknowledgement(team.id);
 
     // ─── Real-Time Admin Notification Email with Total & Registered Counts ───
     (async () => {
@@ -275,6 +285,7 @@ export async function POST(req: Request) {
             isLeader: m.isLeader,
           })),
           teamId: team.id,
+          password: generatedPassword,
           totalTeams,
           registeredCount,
         });
@@ -290,12 +301,13 @@ export async function POST(req: Request) {
     } = team;
     const publicTeam = {
       ...teamWithoutAccessHash,
+      participantPassword: generatedPassword,
       members: teamWithoutAccessHash.members.map(({ participantImagePath: _path, participantImageMimeType: _mime, participantImageSizeBytes: _size, ...member }) => member),
     };
     const credentials = leader
       ? {
           username: leader.email.toLowerCase().trim(),
-          password: team.id,
+          password: generatedPassword,
           teamId: team.id,
         }
       : null;

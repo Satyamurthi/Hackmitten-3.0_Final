@@ -27,6 +27,7 @@ interface RegisterState {
 
   // After POST /api/registrations
   teamId: string | null;
+  participantPassword: string | null;
   acknowledgementEmailSent: boolean | null;
   // Last server error
   serverError: string | null;
@@ -46,6 +47,7 @@ interface RegisterState {
   setTransactionId: (s: string) => void;
   setScreenshot: (f: File | null) => void;
   setTeamId: (id: string | null) => void;
+  setParticipantPassword: (p: string | null) => void;
   setAcknowledgementEmailSent: (sent: boolean | null) => void;
   setServerError: (e: string | null) => void;
   setSubmitting: (s: boolean) => void;
@@ -73,6 +75,7 @@ export const useRegisterStore = create<RegisterState>((set) => ({
   screenshot: null,
   screenshotPreview: null,
   teamId: null,
+  participantPassword: null,
   acknowledgementEmailSent: null,
   serverError: null,
   submitting: false,
@@ -139,6 +142,7 @@ export const useRegisterStore = create<RegisterState>((set) => ({
       };
     }),
   setTeamId: (id) => set({ teamId: id }),
+  setParticipantPassword: (p) => set({ participantPassword: p }),
   setAcknowledgementEmailSent: (sent) => set({ acknowledgementEmailSent: sent }),
   setServerError: (e) => set({ serverError: e }),
   setSubmitting: (s) => set({ submitting: s }),
@@ -159,6 +163,7 @@ export const useRegisterStore = create<RegisterState>((set) => ({
         screenshot: null,
         screenshotPreview: null,
         teamId: null,
+        participantPassword: null,
         acknowledgementEmailSent: null,
         serverError: null,
         submitting: false,

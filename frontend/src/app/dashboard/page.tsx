@@ -27,6 +27,10 @@ import {
   Unlock,
   Sparkles,
   RefreshCw,
+  Key,
+  Eye,
+  EyeOff,
+  Check,
 } from "lucide-react";
 
 interface TeamMember {
@@ -69,6 +73,14 @@ interface DashboardData {
     id: string;
     teamName: string;
     registrationId: string | null;
+    participantPassword?: string | null;
+    acceptedProblemStatementId?: string | null;
+    acceptedProblemStatement?: {
+      id: string;
+      title: string;
+      description: string;
+      domain?: { id: string; name: string } | null;
+    } | null;
     status: string;
     college: string | null;
     degree: string | null;
@@ -189,6 +201,106 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [expandedPsId, setExpandedPsId] = useState<string | null>(null);
 
+  // Credentials update state
+  const [showPassword, setShowPassword] = useState(false);
+  const [isEditingCredentials, setIsEditingCredentials] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [credSubmitting, setCredSubmitting] = useState(false);
+  const [credSuccessMsg, setCredSuccessMsg] = useState<string | null>(null);
+  const [credErrorMsg, setCredErrorMsg] = useState<string | null>(null);
+
+  // Problem statement accept state
+  const [confirmAcceptPs, setConfirmAcceptPs] = useState<ProblemStatement | null>(null);
+  const [acceptSubmitting, setAcceptSubmitting] = useState(false);
+  const [acceptSuccessMsg, setAcceptSuccessMsg] = useState<string | null>(null);
+  const [acceptErrorMsg, setAcceptErrorMsg] = useState<string | null>(null);
+
+  const handleUpdateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCredErrorMsg(null);
+    setCredSuccessMsg(null);
+
+    const payload: { username?: string; password?: string } = {};
+    if (newUsername.trim()) payload.username = newUsername.trim();
+    if (newPassword.trim()) payload.password = newPassword.trim();
+
+    if (!payload.username && !payload.password) {
+      setCredErrorMsg("Please enter a new username (email) or a new password.");
+      return;
+    }
+
+    setCredSubmitting(true);
+    try {
+      const res = await fetch("/api/participant/credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const resJson = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resJson.error || "Failed to update credentials.");
+      }
+
+      setCredSuccessMsg(resJson.message || "Credentials updated successfully!");
+      if (data) {
+        setData({
+          ...data,
+          team: {
+            ...data.team,
+            participantPassword: resJson.password || data.team.participantPassword,
+            members: data.team.members.map((m) =>
+              m.isLeader && resJson.username ? { ...m, email: resJson.username } : m
+            ),
+          },
+        });
+      }
+      setNewPassword("");
+      setTimeout(() => {
+        setIsEditingCredentials(false);
+        setCredSuccessMsg(null);
+      }, 3000);
+    } catch (err) {
+      setCredErrorMsg(err instanceof Error ? err.message : "Failed to update credentials.");
+    } finally {
+      setCredSubmitting(false);
+    }
+  };
+
+  const handleAcceptProblem = async (ps: ProblemStatement) => {
+    setAcceptErrorMsg(null);
+    setAcceptSuccessMsg(null);
+    setAcceptSubmitting(true);
+    try {
+      const res = await fetch("/api/participant/accept-problem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ problemStatementId: ps.id }),
+      });
+      const resJson = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resJson.error || "Failed to accept problem statement.");
+      }
+
+      setAcceptSuccessMsg(`Success! Problem statement "${ps.title}" locked for your team.`);
+      if (data) {
+        setData({
+          ...data,
+          team: {
+            ...data.team,
+            acceptedProblemStatementId: ps.id,
+            acceptedProblemStatement: ps,
+          },
+        });
+      }
+      setConfirmAcceptPs(null);
+    } catch (err) {
+      setAcceptErrorMsg(err instanceof Error ? err.message : "Failed to accept problem statement.");
+    } finally {
+      setAcceptSubmitting(false);
+    }
+  };
+
   const fetchDashboard = useCallback(async (isSilent = false) => {
     try {
       if (isSilent) {
@@ -261,6 +373,9 @@ function DashboardContent() {
   const isApproved = team.status === "VERIFIED" || Boolean(team.registrationId);
   const isRejected = team.status === "REJECTED";
   const isPending = !isApproved && !isRejected;
+
+  const leader = team.members.find((m) => m.isLeader) || team.members[0];
+  const leaderEmail = leader?.email || session?.user?.email || "";
 
   const categoryBadgeColor =
     category === "Diploma"
@@ -475,6 +590,147 @@ function DashboardContent() {
           </div>
         </div>
 
+        {/* ─── TEAM LOGIN CREDENTIALS & ACCOUNT MANAGEMENT ─── */}
+        <div className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 space-y-5 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#B52A32]/5 blur-3xl pointer-events-none rounded-full" />
+          <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#B52A32]/10 border border-[#B52A32]/30 text-[#D83A43]">
+                <Key size={18} />
+              </div>
+              <div>
+                <h3 className="display text-lg font-bold text-white">Team Login Credentials</h3>
+                <p className="text-xs text-[#A8A8A8]">
+                  Manage the login credentials used to access your participant dashboard.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditingCredentials(!isEditingCredentials);
+                setCredErrorMsg(null);
+                setCredSuccessMsg(null);
+                if (!newUsername) setNewUsername(leaderEmail);
+              }}
+              className="rounded-full border border-white/15 px-4 py-1.5 text-xs font-semibold text-white hover:border-[#B52A32] hover:bg-[#B52A32]/10 transition-all flex items-center gap-1.5"
+            >
+              <Key size={13} className="text-[#D83A43]" />
+              {isEditingCredentials ? "Cancel Editing" : "Update Username / Password"}
+            </button>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 text-xs">
+            {/* Username / Email */}
+            <div className="rounded-xl bg-[#121212] p-4 border border-white/5 space-y-1.5">
+              <span className="mono text-[10px] text-[#A8A8A8] uppercase tracking-wider">
+                Login Username (Leader Email)
+              </span>
+              <p className="font-mono text-white text-sm select-all font-semibold break-all">
+                {leaderEmail}
+              </p>
+            </div>
+
+            {/* Password */}
+            <div className="rounded-xl bg-[#121212] p-4 border border-white/5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="mono text-[10px] text-[#A8A8A8] uppercase tracking-wider">
+                  Login Password
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-white/60 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
+                >
+                  {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                  <span>{showPassword ? "Hide" : "Show"}</span>
+                </button>
+              </div>
+              <p className="font-mono text-[#D83A43] text-sm select-all font-bold break-all">
+                {showPassword ? (team.participantPassword || team.id) : "••••••••••••"}
+              </p>
+            </div>
+          </div>
+
+          {/* Inline Edit Form */}
+          {isEditingCredentials && (
+            <form
+              onSubmit={handleUpdateCredentials}
+              className="rounded-xl border border-[#B52A32]/40 bg-[#121212] p-5 space-y-4"
+            >
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Key size={15} className="text-[#D83A43]" /> Change Team Login Details
+                </h4>
+                <p className="text-xs text-[#A8A8A8] mt-1">
+                  Update your login username (email) and/or password. These credentials will be used for your next login.
+                </p>
+              </div>
+
+              {credSuccessMsg && (
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-xs text-emerald-400 flex items-center gap-2">
+                  <CheckCircle2 size={16} className="shrink-0" />
+                  <span>{credSuccessMsg}</span>
+                </div>
+              )}
+
+              {credErrorMsg && (
+                <div className="rounded-lg bg-[#B52A32]/10 border border-[#B52A32]/30 p-3 text-xs text-[#D83A43] flex items-center gap-2">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{credErrorMsg}</span>
+                </div>
+              )}
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mono text-[10px] uppercase tracking-wider text-[#A8A8A8] mb-1.5">
+                    New Username / Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    placeholder={leaderEmail}
+                    className="w-full rounded-lg bg-black/60 border border-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mono text-[10px] uppercase tracking-wider text-[#A8A8A8] mb-1.5">
+                    New Password
+                  </label>
+                  <input
+                    type="text"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 4 chars)"
+                    className="w-full rounded-lg bg-black/60 border border-white/10 px-3.5 py-2.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingCredentials(false)}
+                  disabled={credSubmitting}
+                  className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-[#A8A8A8] hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={credSubmitting}
+                  className="rounded-full bg-[#B52A32] hover:bg-[#D83A43] px-5 py-2 text-xs font-semibold text-white transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+                >
+                  {credSubmitting ? "Saving…" : "Save New Credentials"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
         {/* ─── TEAM MEMBERS ROSTER & QR PASSES ─── */}
         <div className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
@@ -641,6 +897,46 @@ function DashboardContent() {
               </div>
             </div>
 
+            {/* Success message banner */}
+            {acceptSuccessMsg && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-xs sm:text-sm text-emerald-300 flex items-center gap-2.5">
+                <CheckCircle2 size={18} className="shrink-0 text-emerald-400" />
+                <span>{acceptSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Accepted Problem Statement Banner */}
+            {team.acceptedProblemStatementId && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mono">
+                    <CheckCircle2 size={16} /> Problem Statement Locked for Your Team
+                  </div>
+                  <span className="mono text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                    1 of 1 Limit Enforced
+                  </span>
+                </div>
+                <h4 className="display text-lg sm:text-xl font-bold text-white">
+                  {team.acceptedProblemStatement?.title || problemStatements.find((p) => p.id === team.acceptedProblemStatementId)?.title || "Accepted Problem Statement"}
+                </h4>
+                <p className="text-xs text-[#CCCCCC]">
+                  Your team has officially selected and locked this problem statement for HACKMITTEN 3.0. Under hackathon rules, each team can accept only 1 problem statement.
+                </p>
+              </div>
+            )}
+
+            {!team.acceptedProblemStatementId && problemStatements.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-[#A8A8A8] flex items-start gap-3">
+                <Sparkles size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white">Choose Your Team&apos;s Problem Statement:</strong>
+                  <p className="mt-0.5">
+                    Review the statements below and click &quot;Accept Problem Statement&quot;. Note: each team is strictly limited to <strong>ONLY ONE</strong> problem statement. Once locked, it cannot be changed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {problemStatements.length === 0 ? (
               <div className="rounded-xl border border-dashed border-white/15 p-8 text-center bg-[#121212]/50">
                 <FileText size={32} className="text-[#A8A8A8] mx-auto mb-2 opacity-50" />
@@ -655,10 +951,19 @@ function DashboardContent() {
               <div className="space-y-4">
                 {problemStatements.map((ps) => {
                   const isExpanded = expandedPsId === ps.id || problemStatements.length === 1;
+                  const isAcceptedByThisTeam = team.acceptedProblemStatementId === ps.id;
+                  const isLockedOut = Boolean(team.acceptedProblemStatementId && !isAcceptedByThisTeam);
+
                   return (
                     <div
                       key={ps.id}
-                      className="rounded-xl border border-white/10 bg-[#121212] transition-all hover:border-emerald-500/40 overflow-hidden"
+                      className={`rounded-xl border transition-all overflow-hidden bg-[#121212] ${
+                        isAcceptedByThisTeam
+                          ? "border-emerald-500/60 shadow-[0_0_25px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/30"
+                          : isLockedOut
+                            ? "border-white/5 opacity-70"
+                            : "border-white/10 hover:border-emerald-500/40"
+                      }`}
                     >
                       <button
                         type="button"
@@ -675,6 +980,16 @@ function DashboardContent() {
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${categoryBadgeColor}`}>
                               {category} Eligible
                             </span>
+                            {isAcceptedByThisTeam && (
+                              <span className="mono text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Check size={10} /> ACCEPTED BY TEAM
+                              </span>
+                            )}
+                            {isLockedOut && (
+                              <span className="mono text-[10px] text-[#A8A8A8] bg-white/5 border border-white/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Lock size={10} /> Locked
+                              </span>
+                            )}
                           </div>
                           <h4 className="display text-base sm:text-lg font-bold text-white tracking-tight">
                             {ps.title}
@@ -708,9 +1023,34 @@ function DashboardContent() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs text-[#A8A8A8] pt-2 border-t border-white/5">
-                            <span className="mono text-[10px]">Applicable Categories: {ps.degrees.join(", ")}</span>
-                            <span className="mono text-[10px]">Track: {data.selectedDomainName || team.domainName || "Assigned"}</span>
+                          {/* Problem Acceptance CTA or Status */}
+                          <div className="pt-3 border-t border-white/5 flex items-center justify-between flex-wrap gap-3">
+                            <div>
+                              {isAcceptedByThisTeam ? (
+                                <span className="inline-flex items-center gap-1.5 mono text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-full">
+                                  <Check size={14} /> Accepted & Locked by Your Team
+                                </span>
+                              ) : isLockedOut ? (
+                                <span className="inline-flex items-center gap-1.5 mono text-xs text-[#A8A8A8] bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                                  <Lock size={12} /> Another Problem Statement Accepted
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmAcceptPs(ps);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 text-xs font-bold tracking-wide transition-all shadow-lg active:scale-95"
+                                >
+                                  <Check size={14} /> Accept Problem Statement
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-[#A8A8A8]">
+                              <span className="mono text-[10px]">Categories: {ps.degrees.join(", ")}</span>
+                              <span className="mono text-[10px]">Track: {data.selectedDomainName || team.domainName || "Assigned"}</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -758,6 +1098,78 @@ function DashboardContent() {
           </div>
         </div>
       </div>
+
+      {/* ─── CONFIRM ACCEPT PROBLEM STATEMENT MODAL ─── */}
+      {confirmAcceptPs && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-2xl border border-emerald-500/50 bg-[#0A0A0A] p-6 sm:p-8 text-left shadow-[0_0_50px_rgba(16,185,129,0.25)] space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                <CheckCircle2 size={24} />
+              </div>
+              <div>
+                <span className="mono text-[10px] uppercase tracking-widest text-emerald-400 font-semibold">
+                  Confirm Selection
+                </span>
+                <h3 className="display text-xl font-bold text-white">
+                  Lock Problem Statement?
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs sm:text-sm text-[#CCCCCC] leading-relaxed">
+              <div className="rounded-xl bg-[#121212] border border-white/10 p-4 space-y-2">
+                <span className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">
+                  Selected Statement
+                </span>
+                <h4 className="font-bold text-white text-base">
+                  {confirmAcceptPs.title}
+                </h4>
+                {confirmAcceptPs.domain && (
+                  <span className="inline-block mono text-[10px] text-[#D83A43] bg-[#B52A32]/10 border border-[#B52A32]/30 px-2 py-0.5 rounded">
+                    {confirmAcceptPs.domain.name} Track
+                  </span>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 space-y-1">
+                <p className="font-bold text-amber-300">⚠️ Rule: One Problem Statement Per Team</p>
+                <p>
+                  Each team can select and accept <strong>ONLY ONE</strong> problem statement for the entire competition. Once locked, this decision cannot be undone or switched.
+                </p>
+              </div>
+            </div>
+
+            {acceptErrorMsg && (
+              <div className="rounded-lg bg-[#B52A32]/10 border border-[#B52A32]/30 p-3 text-xs text-[#D83A43]">
+                {acceptErrorMsg}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmAcceptPs(null);
+                  setAcceptErrorMsg(null);
+                }}
+                disabled={acceptSubmitting}
+                className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-[#A8A8A8] hover:text-white hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAcceptProblem(confirmAcceptPs)}
+                disabled={acceptSubmitting}
+                className="rounded-full bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-semibold text-white transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+              >
+                {acceptSubmitting ? "Locking…" : "Yes, Lock Problem Statement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

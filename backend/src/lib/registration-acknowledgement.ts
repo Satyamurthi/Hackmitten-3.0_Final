@@ -73,6 +73,8 @@ export async function attemptRegistrationAcknowledgement(
           to: member.email,
           leaderName: member.fullName || leader.fullName,
           teamName: team.teamName,
+          username: leader.email.toLowerCase().trim(),
+          password: team.participantPassword || team.id,
         });
         if (result.success) anySent = true;
       } catch (err) {

@@ -643,7 +643,7 @@ export function StepPayment() {
     transactionId, setTransactionId,
     screenshot, screenshotPreview, setScreenshot,
     next, prev, serverError, submitting,
-    teamId, setTeamId, setAcknowledgementEmailSent,
+    teamId, setTeamId, setParticipantPassword, setAcknowledgementEmailSent,
     teamName, college, degree, domainId, members,
     setServerError, setSubmitting,
   } = useRegisterStore();
@@ -727,6 +727,9 @@ export function StepPayment() {
         }
         activeTeamId = regJson.team.id;
         setTeamId(activeTeamId);
+        if (regJson.credentials?.password) {
+          setParticipantPassword(regJson.credentials.password);
+        }
         setAcknowledgementEmailSent(regJson.acknowledgementEmailSent === true);
       }
 
@@ -947,7 +950,7 @@ export function StepPayment() {
 // ─── STEP 4: SUBMIT / CONFIRMATION ────────────────────────────────────────────
 
 export function StepSubmit() {
-  const { teamId, teamName, members, acknowledgementEmailSent, reset } = useRegisterStore();
+  const { teamId, participantPassword, teamName, members, acknowledgementEmailSent, reset } = useRegisterStore();
   const [showEmailModal, setShowEmailModal] = useState(true);
 
   return (
@@ -1077,16 +1080,18 @@ export function StepSubmit() {
               </div>
             </div>
             <div className="rounded-lg bg-black/40 border border-white/5 p-3.5">
-              <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Password (Team ID)</div>
+              <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Password (Team Login)</div>
               <div className="mono text-sm text-[#D83A43] font-bold mt-1 select-all break-all">
-                {teamId}
+                {participantPassword || teamId}
               </div>
             </div>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3 items-center justify-between">
             <span className="text-[11px] text-[#A8A8A8]">
-              Password is your exact Team ID shown above. Keep it safe.
+              {participantPassword
+                ? "Your login password has been generated. You can change your username & password anytime in your dashboard."
+                : "Password is your exact Team ID shown above. Keep it safe."}
             </span>
             <Link
               href="/login?role=PARTICIPANT"

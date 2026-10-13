@@ -26,6 +26,11 @@ export async function GET() {
         team: {
           include: {
             domain: true,
+            acceptedProblemStatement: {
+              include: {
+                domain: true,
+              },
+            },
             payment: {
               include: {
                 screenshots: {
@@ -126,6 +131,21 @@ export async function GET() {
         id: team.id,
         teamName: team.teamName,
         registrationId: team.registrationId,
+        participantPassword: team.participantPassword,
+        acceptedProblemStatementId: team.acceptedProblemStatementId,
+        acceptedProblemStatement: team.acceptedProblemStatement
+          ? {
+              id: team.acceptedProblemStatement.id,
+              title: team.acceptedProblemStatement.title,
+              description: team.acceptedProblemStatement.description,
+              domain: team.acceptedProblemStatement.domain
+                ? {
+                    id: team.acceptedProblemStatement.domain.id,
+                    name: team.acceptedProblemStatement.domain.name,
+                  }
+                : null,
+            }
+          : null,
         status: team.status,
         college: team.college,
         degree: team.degree,
