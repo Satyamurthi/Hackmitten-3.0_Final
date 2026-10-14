@@ -29,11 +29,11 @@ export function PublicNav() {
   }, []);
 
   const navLinks = [
-    { label: "Home", href: "#home" },
-    { label: "About", href: "#about" },
-    { label: "Gallery", href: "#gallery" },
-    { label: "Crew", href: "#crew" },
-    { label: "Venue", href: "#venue" },
+    { label: "Home", href: "/#home" },
+    { label: "About", href: "/about" },
+    { label: "Gallery", href: "/#gallery" },
+    { label: "Crew", href: "/#crew" },
+    { label: "Venue", href: "/#venue" },
     ...(regOpen && !isFull ? [{ label: "Register", href: "/register" }] : []),
   ];
 

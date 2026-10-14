@@ -1,10 +1,10 @@
 import Image from "next/image";
 
 const quickLinks = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Crew", href: "#crew" },
+  { label: "Home", href: "/#home" },
+  { label: "About", href: "/about" },
+  { label: "Gallery", href: "/#gallery" },
+  { label: "Crew", href: "/#crew" },
 ];
 
 const socialLinks = [

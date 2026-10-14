@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Terminal,
   Cpu,
@@ -318,16 +319,16 @@ export default function AboutPage() {
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#030303]/85 border-b border-white/[0.08] px-4 sm:px-8 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Brand Identity with Orange & Taller MITT */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D83A43] to-[#8B1E24] p-[1px] flex items-center justify-center shadow-[0_0_15px_rgba(216,58,67,0.4)]">
+          {/* Brand Identity linking back to Home */}
+          <Link href="/" className="flex items-center gap-3 group focus:outline-none" title="Back to HackMITTEN 3.0 Home">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D83A43] to-[#8B1E24] p-[1px] flex items-center justify-center shadow-[0_0_15px_rgba(216,58,67,0.4)] group-hover:scale-105 transition-transform">
               <div className="w-full h-full bg-[#080808] rounded-[7px] flex items-center justify-center">
                 <Terminal className="w-4 h-4 text-[#D83A43]" />
               </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-display font-bold tracking-wider text-sm sm:text-base text-white">
+                <span className="font-display font-bold tracking-wider text-sm sm:text-base text-white group-hover:text-[#D83A43] transition-colors">
                   HACKMITTEN 3.0
                 </span>
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono tracking-widest uppercase bg-[#D83A43]/15 text-[#D83A43] border border-[#D83A43]/30">
@@ -338,7 +339,7 @@ export default function AboutPage() {
                 MIT Thandavapura × VigyanLabs
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* Quick HUD Navigation Anchor Pills */}
           <nav className="hidden lg:flex items-center gap-1.5 text-xs font-mono">
@@ -368,14 +369,25 @@ export default function AboutPage() {
             ))}
           </nav>
 
-          {/* Live Node Status Badge */}
-          <div className="flex items-center gap-2 text-xs font-mono bg-[#080808] border border-white/10 px-3 py-1.5 rounded-full">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D83A43] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#D83A43]"></span>
-            </span>
-            <span className="text-[#A8A8A8] hidden sm:inline">OCT 28–29, 2026</span>
-            <span className="text-white font-medium">24H SPRINT</span>
+          {/* Live Node Status Badge & Home Link */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-xs font-mono text-white transition-all hover:border-[#D83A43] hover:text-[#D83A43]"
+              title="Return to Main Portal"
+            >
+              <span>←</span>
+              <span>Home</span>
+            </Link>
+
+            <div className="flex items-center gap-2 text-xs font-mono bg-[#080808] border border-white/10 px-3 py-1.5 rounded-full">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D83A43] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#D83A43]"></span>
+              </span>
+              <span className="text-[#A8A8A8] hidden sm:inline">OCT 28–29, 2026</span>
+              <span className="text-white font-medium">24H SPRINT</span>
+            </div>
           </div>
         </div>
       </header>

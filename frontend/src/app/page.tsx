@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useScrollProgress } from "@/components/three/use-scroll-progress";
 import { PublicNav } from "@/components/public/nav";
 import { Hero } from "@/components/sections/hero";
-import { About } from "@/components/sections/about";
 import { Gallery } from "@/components/sections/gallery";
 import { Coordinators } from "@/components/sections/coordinators";
 import { Sponsors } from "@/components/sections/sponsors";
@@ -58,7 +57,6 @@ export default function HomePage() {
         <PublicNav />
         <main>
           <Hero />
-          <Reveal><About /></Reveal>
           <Reveal delay={80}><Gallery /></Reveal>
           <Reveal delay={100}><Coordinators /></Reveal>
           <Reveal delay={80}><Sponsors /></Reveal>
