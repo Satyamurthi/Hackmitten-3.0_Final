@@ -70,6 +70,14 @@ export function jsonError(err: unknown): Response {
       { status: err.statusCode },
     );
   }
+  if (err && typeof err === "object" && ("statusCode" in err || (err instanceof Error && err.name === "UploadError"))) {
+    const statusCode = typeof (err as any).statusCode === "number" ? (err as any).statusCode : 400;
+    const message = (err as any).message || "Invalid upload";
+    return Response.json(
+      { error: message, code: "INVALID_UPLOAD" },
+      { status: statusCode },
+    );
+  }
   const sanitizedLog = err instanceof Error
     ? err.message.replace(/(password|DATABASE_URL|secret|key)=[^\s&'"]+/gi, "$1=[REDACTED]")
     : String(err);

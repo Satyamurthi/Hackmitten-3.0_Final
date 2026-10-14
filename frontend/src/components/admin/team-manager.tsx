@@ -620,22 +620,18 @@ function TeamFormModal({
         })
       );
 
-      // Compress and append member photos
+      // Compress and append member photos (normalizes image and strips any corrupt trailing metadata)
       for (let i = 0; i < members.length; i++) {
         const file = members[i].participantImageFile;
         if (file) {
-          const compressed = file.size > 250 * 1024
-            ? await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 })
-            : file;
+          const compressed = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
           formData.append(`participantImage${i}`, compressed);
         }
       }
 
       // Compress and append payment screenshot
       if (paymentScreenshotFile) {
-        const compressedScreenshot = paymentScreenshotFile.size > 500 * 1024
-          ? await compressImage(paymentScreenshotFile, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 })
-          : paymentScreenshotFile;
+        const compressedScreenshot = await compressImage(paymentScreenshotFile, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 });
         formData.append("paymentScreenshot", compressedScreenshot);
       }
 

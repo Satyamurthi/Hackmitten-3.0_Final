@@ -77,4 +77,14 @@ describe("image upload validation", () => {
     const file = new File([Buffer.concat([png, Buffer.from("<script>alert(1)</script>")])], "image.png", { type: "image/png" });
     await expect(validateImageFile(file)).rejects.toThrow("trailing data");
   });
+
+  it("accepts valid images with harmless trailing null bytes padding", async () => {
+    const jpeg = await sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).jpeg().toBuffer();
+    const paddedJpeg = new File([Buffer.concat([jpeg, Buffer.from([0, 0, 0, 0])])], "photo.jpg", { type: "image/jpeg" });
+    expect(await validateImageFile(paddedJpeg)).toBe("image/jpeg");
+
+    const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).png().toBuffer();
+    const paddedPng = new File([Buffer.concat([png, Buffer.from([0, 0, 0, 0])])], "photo.png", { type: "image/png" });
+    expect(await validateImageFile(paddedPng)).toBe("image/png");
+  });
 });

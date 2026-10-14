@@ -64,15 +64,24 @@ export function detectImageMime(head: Uint8Array): string | null {
 }
 
 function hasStrictImageBoundary(bytes: Uint8Array, mime: string): boolean {
-  if (mime === "image/jpeg") return bytes.length >= 4 && bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9;
-  if (mime === "image/png") {
-    return bytes.length >= 20 && bytes.at(-12) === 0 && bytes.at(-11) === 0 && bytes.at(-10) === 0 && bytes.at(-9) === 0 &&
-      bytes.at(-8) === 0x49 && bytes.at(-7) === 0x45 && bytes.at(-6) === 0x4e && bytes.at(-5) === 0x44;
+  let end = bytes.length;
+  // Ignore harmless trailing padding (null bytes or EOF whitespace) added by mobile cameras or sector boundaries
+  while (end > 0 && (bytes[end - 1] === 0x00 || bytes[end - 1] === 0x0a || bytes[end - 1] === 0x0d || bytes[end - 1] === 0x20)) {
+    end--;
   }
-  if (mime === "image/gif") return bytes.at(-1) === 0x3b;
+
+  if (mime === "image/jpeg") return end >= 2 && bytes[end - 2] === 0xff && bytes[end - 1] === 0xd9;
+  if (mime === "image/png") {
+    return end >= 12 &&
+      bytes[end - 8] === 0x49 && bytes[end - 7] === 0x45 && bytes[end - 6] === 0x4e && bytes[end - 5] === 0x44;
+  }
+  if (mime === "image/gif") return end >= 1 && bytes[end - 1] === 0x3b;
   if (mime === "image/webp") {
-    return bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-      new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true) + 8 === bytes.length;
+    if (bytes.length < 12 || bytes[0] !== 0x52 || bytes[1] !== 0x49 || bytes[2] !== 0x46 || bytes[3] !== 0x46) {
+      return false;
+    }
+    const riffPayload = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true);
+    return riffPayload + 8 === bytes.length || riffPayload + 8 === end;
   }
   return false;
 }
