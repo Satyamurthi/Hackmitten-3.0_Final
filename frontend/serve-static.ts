@@ -64,11 +64,19 @@ serve({
     if (!(await file.exists())) {
       file = Bun.file(join(import.meta.dir, "out", path + ".html"));
       if (!(await file.exists())) {
-        const notFoundFile = Bun.file(join(import.meta.dir, "out", "404.html"));
-        if (await notFoundFile.exists()) {
-          return new Response(notFoundFile, { status: 404, headers: { "Content-Type": "text/html" } });
+        // Support case-insensitive paths (e.g., /About -> /about.html)
+        const lowerPath = path.toLowerCase();
+        file = Bun.file(join(import.meta.dir, "out", lowerPath + ".html"));
+        if (!(await file.exists())) {
+          file = Bun.file(join(import.meta.dir, "out", lowerPath));
+          if (!(await file.exists())) {
+            const notFoundFile = Bun.file(join(import.meta.dir, "out", "404.html"));
+            if (await notFoundFile.exists()) {
+              return new Response(notFoundFile, { status: 404, headers: { "Content-Type": "text/html" } });
+            }
+            return new Response("404 Not Found", { status: 404 });
+          }
         }
-        return new Response("404 Not Found", { status: 404 });
       }
     }
     
