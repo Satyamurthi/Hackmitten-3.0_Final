@@ -565,12 +565,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const currentLeader = parsedMembers?.find((m: any) => m.isLeader) || team.members.find((m) => m.isLeader) || team.members[0];
       const finalUsername = assignedUsername || updateData.loginUsername || team.loginUsername || currentLeader?.email || "";
       const finalPassword = assignedPassword || updateData.participantPassword || team.participantPassword || team.registrationId || team.id;
+      const recipientEmails = Array.from(new Set([
+        currentLeader?.email,
+        ...(parsedMembers || team.members || []).map((m: any) => m.email)
+      ].filter(Boolean))) as string[];
 
       sendCredentialsEmailToTeam({
-        teamId: id,
         teamName: effectiveTeamName,
+        leaderName: (currentLeader as any)?.name || (currentLeader as any)?.fullName || "Team Leader",
         username: finalUsername,
         password: finalPassword,
+        recipientEmails,
+        registrationId: team.registrationId,
       }).catch((err) => {
         console.error("[admin/teams/[id]] Failed to send credentials email on edit:", err);
       });

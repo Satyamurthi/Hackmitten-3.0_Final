@@ -12,7 +12,7 @@ const problemStatementCreateSchema = z.object({
     .array(z.enum(VALID_DEGREES))
     .min(1, "At least one applicable category (Diploma, UG, PG) must be selected"),
   domainId: z.string().trim().nullable().optional(),
-  isPublished: z.boolean().default(true),
+  isPublished: z.boolean().default(false),
 });
 
 /**
@@ -55,7 +55,7 @@ export async function GET() {
 
 /**
  * POST /api/admin/problem-statements
- * Creates a new problem statement.
+ * Creates a new problem statement (defaults to unpublished / draft mode).
  */
 export async function POST(req: Request) {
   try {
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
         description,
         degrees,
         domainId: validDomainId,
-        isPublished: isPublished ?? true,
+        isPublished: isPublished ?? false,
       },
       include: {
         domain: {
@@ -102,6 +102,42 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ problemStatement: created }, { status: 201 });
+  } catch (err) {
+    return jsonError(err);
+  }
+}
+
+/**
+ * PATCH /api/admin/problem-statements
+ * Bulk update: open/publish all problem statements at once or unpublish all.
+ */
+export async function PATCH(req: Request) {
+  try {
+    await requirePermission("problem:manage");
+    const body = await req.json().catch(() => ({}));
+    const { isPublished } = body;
+
+    if (typeof isPublished !== "boolean") {
+      return NextResponse.json(
+        { error: "Field 'isPublished' (boolean) is required for bulk update." },
+        { status: 400 },
+      );
+    }
+
+    const result = await db.problemStatement.updateMany({
+      data: {
+        isPublished,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      count: result.count,
+      isPublished,
+      message: isPublished
+        ? `All ${result.count} problem statement(s) have been unlocked and published for all participants.`
+        : `All ${result.count} problem statement(s) have been set to unpublished (Draft) mode.`,
+    });
   } catch (err) {
     return jsonError(err);
   }
