@@ -433,7 +433,7 @@ export function IntroScreen() {
 
           {/* Main Title */}
           <h1 className="display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-none">
-            HACK<span className="text-[#FF8A00] inline-block font-black scale-y-115 text-[1.12em]" style={{ textShadow: "0 0 25px rgba(255,138,0,0.85)" }}>MITT</span>EN{" "}
+            HACKMITTEN{" "}
             <span
               className="text-[#D83A43]"
               style={{

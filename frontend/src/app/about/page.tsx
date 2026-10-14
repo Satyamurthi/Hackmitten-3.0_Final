@@ -328,7 +328,7 @@ export default function AboutPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-display font-bold tracking-wider text-sm sm:text-base text-white">
-                  HACK<span className="text-[#FF8A00] inline-block font-black scale-y-110 text-[1.08em]" style={{ textShadow: "0 0 18px rgba(255,138,0,0.85)" }}>MITT</span>EN 3.0
+                  HACKMITTEN 3.0
                 </span>
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono tracking-widest uppercase bg-[#D83A43]/15 text-[#D83A43] border border-[#D83A43]/30">
                   INFO MATRIX
@@ -428,7 +428,7 @@ export default function AboutPage() {
 
               <p className="text-base sm:text-lg text-[#A8A8A8] leading-relaxed max-w-2xl">
                 <strong className="text-white">
-                  HACK<span className="text-[#FF8A00] inline-block font-black scale-y-110 text-[1.08em]" style={{ textShadow: "0 0 18px rgba(255,138,0,0.85)" }}>MITT</span>EN 3.0
+                  HackMITTEN 3.0
                 </strong>{" "}
                 is a premier 24-hour national-level hackathon organized by the 
                 Departments of <strong className="text-white">Computer Science & Engineering (CS&E)</strong> and{" "}
@@ -641,9 +641,9 @@ export default function AboutPage() {
                       cy="16"
                       r={isCurrent ? "8" : "5"}
                       fill={isPassed ? "#D83A43" : "#0e0e0e"}
-                      stroke={isCurrent ? "#FF8A00" : isPassed ? "#D83A43" : "rgba(255,255,255,0.2)"}
+                      stroke={isCurrent ? "#D83A43" : isPassed ? "#D83A43" : "rgba(255,255,255,0.2)"}
                       strokeWidth={isCurrent ? "2.5" : "1.5"}
-                      style={isCurrent ? { filter: "drop-shadow(0 0 10px #FF8A00)" } : undefined}
+                      style={isCurrent ? { filter: "drop-shadow(0 0 10px rgba(216,58,67,0.85))" } : undefined}
                     />
                     {isCurrent && (
                       <circle

@@ -91,23 +91,7 @@ export function Hero() {
         </div>
 
         <h1 className="hero-title hero-reveal hero-reveal-delay-2 display text-[16vw] sm:text-[14vw] leading-[0.85] font-bold tracking-tight text-white md:text-[12vw] lg:text-[10rem]">
-          <span className="block tracking-tight">
-            HACK
-            <span
-              className="text-[#FF8A00] inline-block font-black transition-all duration-300"
-              style={{
-                fontSize: "1.12em",
-                transform: "scaleY(1.16)",
-                textShadow:
-                  "0 0 25px rgba(255, 138, 0, 0.8), 0 0 55px rgba(255, 122, 0, 0.45)",
-                display: "inline-block",
-                verticalAlign: "baseline",
-              }}
-            >
-              MITT
-            </span>
-            EN
-          </span>
+          <span className="block">{heading}</span>
           <span className="hero-edition block text-[#B52A32] text-glow-red">{edition}</span>
         </h1>
 
