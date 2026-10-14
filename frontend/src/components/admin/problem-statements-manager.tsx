@@ -124,7 +124,7 @@ export function ProblemStatementsManager() {
     setDescription("");
     setDegrees(["UG", "PG"]);
     setDomainId("");
-    setIsPublished(true);
+    setIsPublished(false); // Default to unpublish mode when creating new problem statements
     setActionError(null);
     setModalOpen(true);
   };
@@ -138,6 +138,37 @@ export function ProblemStatementsManager() {
     setIsPublished(item.isPublished);
     setActionError(null);
     setModalOpen(true);
+  };
+
+  const handleBulkPublish = async (publish: boolean) => {
+    const actionText = publish ? "OPEN and PUBLISH" : "UNPUBLISH (set to Draft)";
+    if (
+      !confirm(
+        `Are you sure you want to ${actionText} all ${problemStatements.length} problem statement(s) at once for all participating teams?`
+      )
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await request<{ message: string; count: number }>(
+        "/api/admin/problem-statements",
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublished: publish }),
+        }
+      );
+      await refresh();
+      setSuccessMessage(res.message || `All problem statements updated successfully.`);
+    } catch (err: any) {
+      setActionError(err.message || "Failed to bulk update problem statements.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleToggleDegree = (deg: string) => {
@@ -367,6 +398,34 @@ export function ProblemStatementsManager() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-[#A8A8A8]">
+            <span>Total: <strong className="text-white">{problemStatements.length}</strong></span>
+            <span>•</span>
+            <span className="text-emerald-400">Open: <strong>{problemStatements.filter((p) => p.isPublished).length}</strong></span>
+            <span>•</span>
+            <span className="text-amber-400">Draft: <strong>{problemStatements.filter((p) => !p.isPublished).length}</strong></span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleBulkPublish(true)}
+            disabled={problemStatements.length === 0 || submitting}
+            className="flex min-h-11 items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500 transition-all disabled:opacity-40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+            title="Open and release ALL problem statements simultaneously for all teams"
+          >
+            <Eye size={15} /> Open All For Teams
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleBulkPublish(false)}
+            disabled={problemStatements.length === 0 || submitting}
+            className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-[#A8A8A8] hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
+            title="Unpublish all problem statements into Draft mode"
+          >
+            <EyeOff size={15} /> Unpublish All
+          </button>
+
           <button
             type="button"
             onClick={exportProblemSelectionsCsv}
@@ -376,6 +435,7 @@ export function ProblemStatementsManager() {
           >
             <Download size={15} /> Export Selections CSV
           </button>
+
           <button
             type="button"
             onClick={openAddModal}
@@ -868,6 +928,37 @@ export function ProblemStatementsManager() {
                   onChange={setDescription}
                   placeholder="Describe the problem background, objective, expected deliverables, evaluation criteria, and constraints with styles, lists, and code blocks..."
                 />
+              </div>
+
+              {/* Publication Status Toggle */}
+              <div className="flex items-center justify-between p-3.5 rounded-lg border border-white/10 bg-[#141414]">
+                <div>
+                  <div className="text-xs font-semibold text-white flex items-center gap-2">
+                    {isPublished ? (
+                      <span className="flex items-center gap-1.5 text-emerald-400">
+                        <Eye size={14} /> Published Mode (Open for participants)
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-amber-400">
+                        <EyeOff size={14} /> Unpublished Mode (Draft)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#A8A8A8] mt-0.5">
+                    {isPublished
+                      ? "Participants in matching categories will see this statement once the release countdown expires."
+                      : "Saved in unpublish mode (Draft). New statements default to draft so you can release all at once via 'Open All For Teams'."}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                  <input
+                    type="checkbox"
+                    checked={isPublished}
+                    onChange={(e) => setIsPublished(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
               </div>
 
               {/* Form Buttons */}

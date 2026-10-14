@@ -220,6 +220,51 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#030303] text-[#F2F2F2] selection:bg-[#B52A32] selection:text-white font-sans antialiased relative overflow-x-hidden">
       
+      {/* ---------------- SCI-FI CYBER ANIMATIONS & KEYFRAMES ---------------- */}
+      <style>{`
+        @keyframes cyberScan {
+          0% {
+            top: -5%;
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.75;
+          }
+          90% {
+            opacity: 0.75;
+          }
+          100% {
+            top: 105%;
+            opacity: 0;
+          }
+        }
+
+        @keyframes circuitDash {
+          0% {
+            stroke-dashoffset: 48;
+          }
+          100% {
+            stroke-dashoffset: 0;
+          }
+        }
+
+        @keyframes pulseGlowRing {
+          0%, 100% {
+            transform: scale(1);
+            filter: drop-shadow(0 0 6px rgba(216, 58, 67, 0.4));
+          }
+          50% {
+            transform: scale(1.1);
+            filter: drop-shadow(0 0 16px rgba(216, 58, 67, 0.85));
+          }
+        }
+
+        @keyframes cornerFlicker {
+          0%, 100% { opacity: 0.8; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
+
       {/* ---------------- BACKGROUND CYBER GRID & GLOWS ---------------- */}
       <div className="fixed inset-0 pointer-events-none z-0">
         {/* Subtle grid pattern */}
@@ -240,13 +285,40 @@ export default function AboutPage() {
           className="absolute top-[45%] -right-[15%] w-[600px] h-[600px] rounded-full blur-[180px] opacity-10 pointer-events-none"
           style={{ background: "radial-gradient(circle, #B52A32 0%, transparent 70%)" }}
         />
+
+        {/* Animated Cyber Laser Scan Beam */}
+        <div
+          className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#D83A43]/70 to-transparent pointer-events-none"
+          style={{
+            animation: "cyberScan 9s linear infinite",
+            boxShadow: "0 0 18px rgba(216,58,67,0.7), 0 0 36px rgba(216,58,67,0.35)",
+          }}
+        />
+
+        {/* Ambient Tech Circuit Lines on Left & Right Margins */}
+        <div className="hidden 2xl:block absolute left-8 top-32 bottom-32 w-px border-l border-white/5">
+          <div className="absolute top-1/4 -left-1.5 w-3 h-3 rounded-full border border-[#D83A43]/40 bg-[#030303] flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-[#D83A43] animate-ping" />
+          </div>
+          <div className="absolute top-1/2 -left-1 text-[9px] font-mono text-white/30 rotate-90 origin-left">
+            SYS.NODE.LEFT // 12°18'N
+          </div>
+        </div>
+        <div className="hidden 2xl:block absolute right-8 top-32 bottom-32 w-px border-r border-white/5">
+          <div className="absolute top-2/3 -right-1.5 w-3 h-3 rounded-full border border-[#D83A43]/40 bg-[#030303] flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-[#D83A43] animate-ping" />
+          </div>
+          <div className="absolute top-1/3 -right-1 text-[9px] font-mono text-white/30 -rotate-90 origin-right">
+            SYS.NODE.RIGHT // 76°71'E
+          </div>
+        </div>
       </div>
 
       {/* ---------------- FLOATING TOP COMMAND HUD BAR ---------------- */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#030303]/85 border-b border-white/[0.08] px-4 sm:px-8 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Brand Identity */}
+          {/* Brand Identity with Orange & Taller MITT */}
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D83A43] to-[#8B1E24] p-[1px] flex items-center justify-center shadow-[0_0_15px_rgba(216,58,67,0.4)]">
               <div className="w-full h-full bg-[#080808] rounded-[7px] flex items-center justify-center">
@@ -256,7 +328,7 @@ export default function AboutPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-display font-bold tracking-wider text-sm sm:text-base text-white">
-                  HACKMITTEN 3.0
+                  HACK<span className="text-[#FF8A00] inline-block font-black scale-y-110 text-[1.08em]" style={{ textShadow: "0 0 18px rgba(255,138,0,0.85)" }}>MITT</span>EN 3.0
                 </span>
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono tracking-widest uppercase bg-[#D83A43]/15 text-[#D83A43] border border-[#D83A43]/30">
                   INFO MATRIX
@@ -308,6 +380,29 @@ export default function AboutPage() {
         </div>
       </header>
 
+      {/* ---------------- REAL-TIME SYSTEM TELEMETRY STRIP ---------------- */}
+      <div className="border-b border-white/[0.08] bg-[#050505]/95 py-1.5 px-4 sm:px-8 text-[10px] font-mono text-[#888] overflow-x-auto whitespace-nowrap z-40 relative flex items-center justify-between gap-6 shadow-sm">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+            SYS.STATUS: OPERATIONAL
+          </span>
+          <span className="text-white/20">|</span>
+          <span className="text-white/80">LAT: 12°11'06"N • LNG: 76°42'44"E (MITT MYSURU)</span>
+          <span className="text-white/20">|</span>
+          <span className="text-white/80">CIRCUIT: 24-HOUR DISTRIBUTED MATRIX</span>
+          <span className="text-white/20">|</span>
+          <span className="text-[#D83A43] font-bold">VIGYANLABS COLLABORATIVE</span>
+        </div>
+        <div className="hidden md:flex items-center gap-4 text-white/50">
+          <span>EVENT HORIZON: LOCKED</span>
+          <span>•</span>
+          <span>NODES: LIVE TELEMETRY</span>
+          <span>•</span>
+          <span className="text-white/90 font-bold">EDITION: 3.0.26</span>
+        </div>
+      </div>
+
       {/* ---------------- MAIN CONTENT BODY ---------------- */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-20 sm:space-y-28">
 
@@ -332,7 +427,10 @@ export default function AboutPage() {
               </h1>
 
               <p className="text-base sm:text-lg text-[#A8A8A8] leading-relaxed max-w-2xl">
-                <strong className="text-white">HackMITTEN 3.0</strong> is a premier 24-hour national-level hackathon organized by the 
+                <strong className="text-white">
+                  HACK<span className="text-[#FF8A00] inline-block font-black scale-y-110 text-[1.08em]" style={{ textShadow: "0 0 18px rgba(255,138,0,0.85)" }}>MITT</span>EN 3.0
+                </strong>{" "}
+                is a premier 24-hour national-level hackathon organized by the 
                 Departments of <strong className="text-white">Computer Science & Engineering (CS&E)</strong> and{" "}
                 <strong className="text-white">CS&E (Artificial Intelligence & Machine Learning)</strong> at{" "}
                 <strong className="text-white">Maharaja Institute of Technology Thandavapura (MITT), Mysuru</strong>, 
@@ -415,11 +513,20 @@ export default function AboutPage() {
                     <Cpu className="w-8 h-8 text-[#D83A43] shrink-0" />
                   </div>
 
-                  {/* SVG Circuit Connector Vertical Line */}
+                  {/* SVG Circuit Connector Vertical Line with dynamic pulse */}
                   <div className="flex justify-center -my-2 relative z-0">
                     <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
-                      <line x1="12" y1="0" x2="12" y2="28" stroke="#D83A43" strokeWidth="2" strokeDasharray="3 3" />
-                      <circle cx="12" cy="14" r="3" fill="#D83A43" />
+                      <line
+                        x1="12"
+                        y1="0"
+                        x2="12"
+                        y2="28"
+                        stroke="#D83A43"
+                        strokeWidth="2"
+                        strokeDasharray="4 3"
+                        style={{ animation: "circuitDash 1.2s linear infinite" }}
+                      />
+                      <circle cx="12" cy="14" r="3.5" fill="#D83A43" className="animate-pulse" />
                     </svg>
                   </div>
 
@@ -439,13 +546,19 @@ export default function AboutPage() {
                     <Network className="w-7 h-7 text-white/70 shrink-0" />
                   </div>
 
-                  {/* SVG Circuit Connector Split */}
+                  {/* SVG Circuit Connector Split with animated flow */}
                   <div className="flex justify-center -my-2 relative z-0">
                     <svg width="180" height="32" viewBox="0 0 180 32" fill="none">
-                      <path d="M90 0 V14 H30 V32 M90 14 H150 V32" stroke="#B52A32" strokeWidth="1.5" />
-                      <circle cx="90" cy="14" r="3" fill="#D83A43" />
-                      <circle cx="30" cy="30" r="2.5" fill="#B52A32" />
-                      <circle cx="150" cy="30" r="2.5" fill="#B52A32" />
+                      <path
+                        d="M90 0 V14 H30 V32 M90 14 H150 V32"
+                        stroke="#D83A43"
+                        strokeWidth="1.8"
+                        strokeDasharray="5 3"
+                        style={{ animation: "circuitDash 1.5s linear infinite" }}
+                      />
+                      <circle cx="90" cy="14" r="3.5" fill="#D83A43" />
+                      <circle cx="30" cy="30" r="3" fill="#D83A43" className="animate-pulse" />
+                      <circle cx="150" cy="30" r="3" fill="#D83A43" className="animate-pulse" />
                     </svg>
                   </div>
 
@@ -494,6 +607,60 @@ export default function AboutPage() {
             <p className="text-[#A8A8A8] text-sm sm:text-base mt-1 max-w-2xl">
               An interconnected circuit of sequential stages that every participating team navigates from registration to grand valedictory.
             </p>
+          </div>
+
+          {/* Animated SVG Circuit Pipeline Trace between Steps */}
+          <div className="hidden lg:block relative px-4 py-2 bg-[#060606] border border-white/5 rounded-xl">
+            <div className="flex items-center justify-between text-[10px] font-mono text-[#777] mb-2 px-2">
+              <span>TRACE: LIVE SEQUENTIAL PIPELINE</span>
+              <span className="text-[#D83A43]">ACTIVE NODE: PHASE 0{activePipelineStep}</span>
+            </div>
+            <svg className="w-full h-8 overflow-visible" viewBox="0 0 1000 32" fill="none">
+              <line x1="30" y1="16" x2="970" y2="16" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+              <line
+                x1="30"
+                y1="16"
+                x2={`${((activePipelineStep - 1) / 5) * 940 + 30}`}
+                y2="16"
+                stroke="#D83A43"
+                strokeWidth="2.5"
+                strokeDasharray="8 4"
+                style={{
+                  animation: "circuitDash 1.2s linear infinite",
+                  filter: "drop-shadow(0 0 8px rgba(216,58,67,0.8))",
+                }}
+              />
+              {[0, 1, 2, 3, 4, 5].map((i) => {
+                const cx = (i / 5) * 940 + 30;
+                const isPassed = activePipelineStep >= i + 1;
+                const isCurrent = activePipelineStep === i + 1;
+                return (
+                  <g key={i}>
+                    <circle
+                      cx={cx}
+                      cy="16"
+                      r={isCurrent ? "8" : "5"}
+                      fill={isPassed ? "#D83A43" : "#0e0e0e"}
+                      stroke={isCurrent ? "#FF8A00" : isPassed ? "#D83A43" : "rgba(255,255,255,0.2)"}
+                      strokeWidth={isCurrent ? "2.5" : "1.5"}
+                      style={isCurrent ? { filter: "drop-shadow(0 0 10px #FF8A00)" } : undefined}
+                    />
+                    {isCurrent && (
+                      <circle
+                        cx={cx}
+                        cy="16"
+                        r="14"
+                        fill="none"
+                        stroke="#D83A43"
+                        strokeWidth="1"
+                        opacity="0.6"
+                        className="animate-ping"
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
           </div>
 
           {/* Interactive Pipeline Node Strip */}

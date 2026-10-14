@@ -182,41 +182,52 @@ export function IntroScreen() {
   return (
     <>
       <style>{`
-        /* Antigravity Arrival: Left Logo floats in smoothly from deep left and settles */
+        /* Rapid kinetic arrival with smooth cushioned deceleration */
         @keyframes antigravityLeftIn {
           0% {
             opacity: 0;
-            transform: translate3d(-48px, 8px, 0) scale(0.88);
+            transform: translate3d(-70px, 0, 0) scale(0.82);
+            filter: blur(4px);
           }
-          70% {
-            transform: translate3d(4px, -2px, 0) scale(1.02);
+          65% {
+            opacity: 1;
+            transform: translate3d(2px, 0, 0) scale(1.02);
+            filter: blur(0px);
           }
           100% {
             opacity: 1;
             transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
           }
         }
 
-        /* Antigravity Arrival: Right Logo floats in smoothly from deep right and settles */
         @keyframes antigravityRightIn {
           0% {
             opacity: 0;
-            transform: translate3d(48px, 8px, 0) scale(0.88);
+            transform: translate3d(70px, 0, 0) scale(0.82);
+            filter: blur(4px);
           }
-          70% {
-            transform: translate3d(-4px, -2px, 0) scale(1.02);
+          65% {
+            opacity: 1;
+            transform: translate3d(-2px, 0, 0) scale(1.02);
+            filter: blur(0px);
           }
           100% {
             opacity: 1;
             transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
           }
         }
 
-        /* College Title: smooth cosmic reveal and settle */
+        /* College Title: smooth rapid reveal and settle */
         @keyframes antigravityTitleIn {
           0% {
             opacity: 0;
-            transform: translate3d(0, -18px, 0) scale(0.96);
+            transform: translate3d(0, -24px, 0) scale(0.92);
+          }
+          70% {
+            opacity: 1;
+            transform: translate3d(0, 1px, 0) scale(1.01);
           }
           100% {
             opacity: 1;
@@ -224,33 +235,41 @@ export function IntroScreen() {
           }
         }
 
-        /* Hackmitten 3.0 Centerpiece: arrives from deep cosmic space */
+        /* Hackmitten 3.0 Centerpiece: arrives rapidly and docks smoothly */
         @keyframes antigravityCoreIn {
           0% {
             opacity: 0;
-            transform: translate3d(0, 24px, 0) scale(0.92);
+            transform: translate3d(0, 32px, 0) scale(0.88);
+            filter: blur(3px);
           }
-          70% {
-            transform: translate3d(0, -3px, 0) scale(1.01);
+          68% {
+            opacity: 1;
+            transform: translate3d(0, -2px, 0) scale(1.01);
+            filter: blur(0px);
           }
           100% {
             opacity: 1;
             transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
           }
         }
 
-        /* Sponsor & Department Logos: float up weightlessly and settle into orbit */
+        /* Sponsor & Department Logos: rapid kinetic float in with smooth landing */
         @keyframes antigravitySponsorIn {
           0% {
             opacity: 0;
-            transform: translate3d(0, 36px, 0) scale(0.82);
+            transform: translate3d(0, 36px, 0) scale(0.72);
+            filter: blur(3px);
           }
-          70% {
-            transform: translate3d(0, -4px, 0) scale(1.03);
+          65% {
+            opacity: 1;
+            transform: translate3d(0, -3px, 0) scale(1.04);
+            filter: blur(0px);
           }
           100% {
             opacity: 1;
             transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
           }
         }
 
@@ -342,17 +361,17 @@ export function IntroScreen() {
             1. TOP SECTION: Antigravity Logo Arrival & College Branding
             ──────────────────────────────────────────────────────────────── */}
         <header className="w-full max-w-7xl mx-auto pt-1 sm:pt-2 px-4 sm:px-8 flex items-center justify-between shrink-0 gap-3 sm:gap-6">
-          {/* Left: MIT Thandavapura Logo (Antigravity arrival from left -> settles) */}
+          {/* Left: MIT Thandavapura Logo (Rapid arrival from left -> settles) */}
           <div
             className="flex items-center shrink-0"
             style={{
-              animation: "antigravityLeftIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
+              animation: "antigravityLeftIn 0.45s cubic-bezier(0.12, 1, 0.22, 1) both",
             }}
           >
             <div
               className="h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-28 lg:w-28 rounded-full bg-white/10 p-1.5 ring-2 ring-white/35 shadow-[0_0_36px_rgba(255,255,255,0.22)]"
               style={{
-                animation: "antigravityFloat 3.8s ease-in-out 0.8s infinite",
+                animation: "antigravityFloat 3.8s ease-in-out 0.5s infinite",
               }}
             >
               <img
@@ -367,7 +386,7 @@ export function IntroScreen() {
           <div
             className="text-center px-2 flex-1 max-w-3xl"
             style={{
-              animation: "antigravityTitleIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both",
+              animation: "antigravityTitleIn 0.42s cubic-bezier(0.12, 1, 0.22, 1) 0.04s both",
             }}
           >
             <h2 className="display text-xs sm:text-lg md:text-2xl lg:text-3xl font-extrabold tracking-tight text-white leading-tight uppercase">
@@ -375,17 +394,17 @@ export function IntroScreen() {
             </h2>
           </div>
 
-          {/* Right: 10-Year Excellence Logo (Antigravity arrival from right -> settles) */}
+          {/* Right: 10-Year Excellence Logo (Rapid arrival from right -> settles) */}
           <div
             className="flex items-center shrink-0"
             style={{
-              animation: "antigravityRightIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both",
+              animation: "antigravityRightIn 0.45s cubic-bezier(0.12, 1, 0.22, 1) both",
             }}
           >
             <div
               className="h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-28 lg:w-28 rounded-full bg-black/60 p-1.5 ring-2 ring-[#D83A43]/85 shadow-[0_0_36px_rgba(216,58,67,0.45)]"
               style={{
-                animation: "antigravityFloatAlt 3.8s ease-in-out 0.8s infinite",
+                animation: "antigravityFloatAlt 3.8s ease-in-out 0.5s infinite",
               }}
             >
               <img
@@ -403,7 +422,7 @@ export function IntroScreen() {
         <main
           className="w-full max-w-4xl mx-auto px-4 text-center my-auto py-1 sm:py-2 flex flex-col items-center justify-center shrink-0"
           style={{
-            animation: "antigravityCoreIn 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both",
+            animation: "antigravityCoreIn 0.48s cubic-bezier(0.12, 1, 0.22, 1) 0.06s both",
           }}
         >
           {/* Hackathon Badge */}
@@ -414,7 +433,7 @@ export function IntroScreen() {
 
           {/* Main Title */}
           <h1 className="display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-none">
-            HACKMITTEN{" "}
+            HACK<span className="text-[#FF8A00] inline-block font-black scale-y-115 text-[1.12em]" style={{ textShadow: "0 0 25px rgba(255,138,0,0.85)" }}>MITT</span>EN{" "}
             <span
               className="text-[#D83A43]"
               style={{
@@ -441,8 +460,8 @@ export function IntroScreen() {
                   key={i}
                   className="flex items-center gap-2 sm:gap-2.5 bg-white/5 border border-white/15 rounded-full py-0.5 sm:py-1 px-3 sm:px-4 shadow-sm"
                   style={{
-                    animation: `antigravitySponsorIn 0.75s cubic-bezier(0.16, 1, 0.3, 1) ${
-                      0.2 + i * 0.08
+                    animation: `antigravitySponsorIn 0.44s cubic-bezier(0.12, 1, 0.22, 1) ${
+                      0.08 + i * 0.04
                     }s both`,
                   }}
                 >
@@ -483,8 +502,8 @@ export function IntroScreen() {
                     key={sponsor.id}
                     className="group flex flex-col items-center cursor-pointer"
                     style={{
-                      animation: `antigravitySponsorIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${
-                        0.25 + index * 0.05
+                      animation: `antigravitySponsorIn 0.46s cubic-bezier(0.12, 1, 0.22, 1) ${
+                        0.12 + index * 0.03
                       }s both`,
                     }}
                     title={displayName}

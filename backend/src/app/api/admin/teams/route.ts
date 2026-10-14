@@ -353,11 +353,18 @@ export async function POST(req: Request) {
 
     // Send login credentials email to team members if requested (default: true)
     if (bodyData.sendCredentialsEmail !== false && assignedPassword) {
+      const recipientEmails = Array.from(new Set([
+        leaderMember?.email,
+        ...members.map((m: any) => m.email),
+      ].filter(Boolean))) as string[];
+
       sendCredentialsEmailToTeam({
-        teamId: createdTeam.id,
         teamName: createdTeam.teamName,
+        leaderName: leaderMember?.fullName || "Team Leader",
         username: assignedUsername || leaderMember?.email?.toLowerCase().trim() || "",
         password: assignedPassword,
+        recipientEmails,
+        registrationId: createdTeam.registrationId,
       }).catch((err) => {
         console.error("[admin/teams] Failed to send credentials email on creation:", err);
       });
