@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/auth/session-provider";
 import { QueryProvider } from "@/components/auth/query-provider";
+import { ConsoleFilter } from "@/components/common/console-filter";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -51,6 +52,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <ConsoleFilter />
         <SessionProvider>
           <QueryProvider>
             {children}

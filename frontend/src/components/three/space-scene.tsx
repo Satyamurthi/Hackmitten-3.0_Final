@@ -6,6 +6,28 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { Stars } from "@react-three/drei";
 
+// Suppress Three.js r183+ deprecation warning for THREE.Clock.
+// @react-three/fiber internally initializes `clock: new THREE.Clock()` until upstream updates to THREE.Timer.
+if (typeof window !== "undefined") {
+  if (typeof (THREE as unknown as { setConsoleFunction?: (fn: (type: string, message: string, ...params: unknown[]) => void) => void }).setConsoleFunction === "function") {
+    (THREE as unknown as { setConsoleFunction: (fn: (type: string, message: string, ...params: unknown[]) => void) => void }).setConsoleFunction(
+      (type: string, message: string, ...params: unknown[]) => {
+        if (
+          type === "warn" &&
+          typeof message === "string" &&
+          message.includes("Clock: This module has been deprecated")
+        ) {
+          return;
+        }
+        const fn = (console as unknown as Record<string, (...args: unknown[]) => void>)[type];
+        if (typeof fn === "function") {
+          fn(message, ...params);
+        }
+      }
+    );
+  }
+}
+
 // Detect mobile / low-power devices for graceful fallback
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -40,18 +62,50 @@ function useReducedMotion() {
 // BLACK HOLE — dark sphere with accretion disk and gravitational lensing glow
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<number> }) {
+function BlackHole({
+  scrollProgress,
+  visible = true,
+}: {
+  scrollProgress: React.MutableRefObject<number>;
+  visible?: boolean;
+}) {
   const groupRef = useRef<THREE.Group>(null);
   const diskRef = useRef<THREE.Mesh>(null);
   const horizonRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const haloRef = useRef<THREE.Mesh>(null);
+  const logoGroupRef = useRef<THREE.Group>(null);
+  const logoBaseMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const logoBloomMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const [logoTexture, setLogoTexture] = useState<THREE.Texture | null>(null);
+
+  // Smooth cinematic lerp for ring reveal after hero intro animation finishes
+  const opacityRef = useRef(visible ? 1 : 0);
+
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load("/images/branding/hackmitten-ring-logo.png", (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      setLogoTexture(tex);
+    });
+  }, []);
 
   useFrame((state, delta) => {
     const p = scrollProgress.current;
+    const targetOpacity = visible ? 1 : 0;
+    opacityRef.current = THREE.MathUtils.lerp(opacityRef.current, targetOpacity, delta * 2.5);
+    const curOp = opacityRef.current;
+
     if (groupRef.current) {
+      groupRef.current.visible = curOp > 0.002;
       // Camera approaches the black hole as user scrolls — larger base scale for prominent visuals
       const scale = Math.min(2.5, 1.35 + p * 1.3);
-      groupRef.current.scale.setScalar(scale);
+      // Gentle scale expansion as it awakens
+      const enterScale = 0.85 + 0.15 * curOp;
+      groupRef.current.scale.setScalar(scale * enterScale);
       // Subtle rotation
       groupRef.current.rotation.z += delta * 0.02;
     }
@@ -60,13 +114,35 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
       // Tilt towards camera as we approach
       diskRef.current.rotation.x = Math.PI / 2.4 + p * 0.2;
     }
+    if (diskMat) {
+      (diskMat.uniforms.uTime.value as number) = state.clock.elapsedTime;
+      (diskMat.uniforms.uOpacity.value as number) = curOp;
+    }
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.25 + p * 0.55;
+      mat.opacity = (0.25 + p * 0.55) * curOp;
+    }
+    if (haloRef.current) {
+      const mat = haloRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.05 * curOp;
     }
     if (horizonRef.current) {
       const mat = horizonRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.85 + Math.sin(state.clock.elapsedTime * 0.8) * 0.05;
+      mat.opacity = (0.85 + Math.sin(state.clock.elapsedTime * 0.8) * 0.05) * curOp;
+    }
+    if (logoBaseMatRef.current) {
+      logoBaseMatRef.current.opacity = 0.96 * curOp;
+    }
+    if (logoBloomMatRef.current) {
+      logoBloomMatRef.current.opacity = 0.38 * curOp;
+    }
+    if (logoGroupRef.current && groupRef.current) {
+      // Counter-rotate against parent group so the HACKMITTEN text stays upright and readable,
+      // while adding a gentle zero-gravity cosmic sway (+- 2.5 degrees)
+      logoGroupRef.current.rotation.z = -groupRef.current.rotation.z + Math.sin(state.clock.elapsedTime * 0.7) * 0.045;
+      // Subtle rhythmic energy breathing
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.018;
+      logoGroupRef.current.scale.set(pulse, pulse, 1);
     }
   });
 
@@ -84,6 +160,7 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
       blending: THREE.AdditiveBlending,
       uniforms: {
         uTime: { value: 0 },
+        uOpacity: { value: visible ? 1 : 0 },
         uRed: { value: new THREE.Color("#D83A43") },
         uDeepRed: { value: new THREE.Color("#8B1E24") },
       },
@@ -100,6 +177,7 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
         varying vec2 vUv;
         varying float vDist;
         uniform float uTime;
+        uniform float uOpacity;
         uniform vec3 uRed;
         uniform vec3 uDeepRed;
         // simple hash noise
@@ -124,7 +202,7 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
           vec3 col = mix(uRed, uDeepRed, r);
           col = mix(col, vec3(1.0), pow(1.0 - r, 6.0) * 0.5); // bright inner edge
           // Falloff
-          float alpha = (1.0 - r) * 0.95 * streaks;
+          float alpha = (1.0 - r) * 0.95 * streaks * uOpacity;
           alpha *= smoothstep(0.0, 0.15, r) * smoothstep(1.0, 0.85, r);
           gl_FragColor = vec4(col, alpha);
         }
@@ -132,10 +210,6 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
     });
     return mat;
   }, []);
-
-  useFrame((state) => {
-    (diskMat.uniforms.uTime.value as number) = state.clock.elapsedTime;
-  });
 
   return (
     <group ref={groupRef}>
@@ -152,10 +226,41 @@ function BlackHole({ scrollProgress }: { scrollProgress: React.MutableRefObject<
       {/* Accretion disk */}
       <mesh ref={diskRef} geometry={diskGeo} material={diskMat} />
       {/* Faint outer halo */}
-      <mesh scale={1.95}>
+      <mesh ref={haloRef} scale={1.95}>
         <sphereGeometry args={[1, 32, 32]} />
         <meshBasicMaterial color="#8B1E24" transparent opacity={0.05} side={THREE.BackSide} />
       </mesh>
+      {/* HackMITTEN Cosmic Ring Logo — Embedded directly into the event horizon */}
+      {logoTexture && (
+        <group ref={logoGroupRef} position={[0, 0, 1.215]}>
+          {/* Base sharp layer with true alpha transparency */}
+          <mesh renderOrder={15}>
+            <planeGeometry args={[2.52, 2.52]} />
+            <meshBasicMaterial
+              ref={logoBaseMatRef}
+              map={logoTexture}
+              transparent
+              opacity={0.96}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+
+          {/* Holographic plasma glow halo */}
+          <mesh renderOrder={14} scale={1.03}>
+            <planeGeometry args={[2.52, 2.52]} />
+            <meshBasicMaterial
+              ref={logoBloomMatRef}
+              map={logoTexture}
+              transparent
+              opacity={0.38}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
@@ -242,7 +347,13 @@ function CameraRig({ scrollProgress }: { scrollProgress: React.MutableRefObject<
 // SCENE ENTRY
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function SpaceScene({ scrollProgress }: { scrollProgress: React.MutableRefObject<number> }) {
+export default function SpaceScene({
+  scrollProgress,
+  ringVisible = true,
+}: {
+  scrollProgress: React.MutableRefObject<number>;
+  ringVisible?: boolean;
+}) {
   const isMobile = useIsMobile();
   const reduced = useReducedMotion();
   // If reduced motion or no WebGL — render a static gradient fallback instead
@@ -298,7 +409,7 @@ export default function SpaceScene({ scrollProgress }: { scrollProgress: React.M
       <ParticleField scrollProgress={scrollProgress} count={particleCount} radius={12} speed={0.6} />
       <ParticleField scrollProgress={scrollProgress} count={Math.floor(particleCount / 3)} radius={6} speed={1.2} />
 
-      <BlackHole scrollProgress={scrollProgress} />
+      <BlackHole scrollProgress={scrollProgress} visible={ringVisible} />
 
       {enablePostFX && (
         <EffectComposer>

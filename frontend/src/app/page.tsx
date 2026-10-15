@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useScrollProgress } from "@/components/three/use-scroll-progress";
 import { PublicNav } from "@/components/public/nav";
@@ -7,12 +8,10 @@ import { Hero } from "@/components/sections/hero";
 import { Gallery } from "@/components/sections/gallery";
 import { Coordinators } from "@/components/sections/coordinators";
 import { Sponsors } from "@/components/sections/sponsors";
-import { Venue } from "@/components/sections/venue";
 import { CTA } from "@/components/sections/cta";
 import { Footer } from "@/components/sections/footer";
 import { Reveal } from "@/components/ui/reveal";
 import { RegistrationEntryModal } from "@/components/public/registration-entry-modal";
-import { IntroScreen } from "@/components/sections/intro-screen";
 
 // Black hole 3D scene — loaded client-side only, with SSR disabled
 const SpaceScene = dynamic(
@@ -33,15 +32,32 @@ const SpaceScene = dynamic(
 
 export default function HomePage() {
   const { scrollProgress } = useScrollProgress();
+  const [navVisible, setNavVisible] = useState(false);
+  const [ringVisible, setRingVisible] = useState(false);
+
+  const handleShowNav = useCallback(() => {
+    setNavVisible(true);
+    setRingVisible(true);
+  }, []);
+
+  const handleHeroComplete = useCallback(() => {
+    setRingVisible(true);
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const fallbackTimer = setTimeout(() => {
+      setNavVisible(true);
+      setRingVisible(true);
+    }, 8500);
+    return () => clearTimeout(fallbackTimer);
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#030303] text-white">
-      {/* Full-screen Opening Intro for HACKMITTEN 3.0 */}
-      <IntroScreen />
-
       {/* Cinematic 3D background — fixed, behind all content */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <SpaceScene scrollProgress={scrollProgress} />
+        <SpaceScene scrollProgress={scrollProgress} ringVisible={ringVisible} />
       </div>
 
       {/* Subtle vignette overlay */}
@@ -54,13 +70,16 @@ export default function HomePage() {
       />
 
       <div className="relative z-10">
-        <PublicNav />
+        <PublicNav visible={navVisible} />
         <main>
-          <Hero />
+          <Hero
+            startAnimation={true}
+            onShowNav={handleShowNav}
+            onComplete={handleHeroComplete}
+          />
           <Reveal delay={80}><Gallery /></Reveal>
           <Reveal delay={100}><Coordinators /></Reveal>
           <Reveal delay={80}><Sponsors /></Reveal>
-          <Reveal delay={60}><Venue /></Reveal>
           <Reveal delay={100}><CTA /></Reveal>
         </main>
         <Footer />

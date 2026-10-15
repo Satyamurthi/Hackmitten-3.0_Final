@@ -250,6 +250,23 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      const frontendOrigin =
+        process.env.FRONTEND_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (baseUrl.includes(":3001") ? baseUrl.replace(":3001", ":3000") : baseUrl);
+
+      if (url.startsWith("/")) {
+        return `${frontendOrigin}${url}`;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.origin === frontendOrigin || parsed.origin === baseUrl) {
+          return url;
+        }
+      } catch {}
+      return `${frontendOrigin}/login`;
+    },
   },
   // Required at runtime — NextAuth throws in production if NEXTAUTH_SECRET is
   // missing. No dev fallback is provided here.

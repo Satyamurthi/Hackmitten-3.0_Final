@@ -7,10 +7,12 @@ import {
   Phone,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import Link from "next/link";
 
 import { COORDINATORS } from "@/data/coordinators";
 import { DEVELOPING_TEAM } from "@/data/developing-team";
+import { FACULTY_COORDINATORS, FacultyMember } from "@/data/faculty-coordinators";
 
 type Coordinator = {
   id: string;
@@ -170,13 +172,206 @@ function CoordinatorGroup({
       {isStudent ? (
         <StudentCarousel coordinators={coordinators} />
       ) : (
-        <div className="grid grid-cols-4 gap-1 sm:grid-cols-4 sm:gap-3 md:gap-4 lg:gap-6">
-          {coordinators.map((coordinator) => (
-            <CoordinatorCard key={coordinator.id} coordinator={coordinator} />
-          ))}
-        </div>
+        <FacultyCalendarFlip />
       )}
     </div>
+  );
+}
+
+/* ================================================================
+   FACULTY 3D CUBE FLIP  – complete 3D cube rotation at medium speed
+================================================================ */
+
+function FacultyCalendarFlip() {
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentBatch, setCurrentBatch] = useState<FacultyMember[]>(() =>
+    FACULTY_COORDINATORS.slice(0, 4)
+  );
+  const [nextBatch, setNextBatch] = useState<FacultyMember[]>(() =>
+    FACULTY_COORDINATORS.slice(4, 8)
+  );
+  const [rollingSlots, setRollingSlots] = useState<boolean[]>([false, false, false, false]);
+  const batchIndexRef = useRef(0);
+
+  useEffect(() => {
+    if (isPaused || FACULTY_COORDINATORS.length <= 4) return;
+
+    const interval = setInterval(() => {
+      const nextIdx = (batchIndexRef.current + 4) % FACULTY_COORDINATORS.length;
+      const incoming: FacultyMember[] = [];
+      for (let i = 0; i < 4; i++) {
+        incoming.push(FACULTY_COORDINATORS[(nextIdx + i) % FACULTY_COORDINATORS.length]);
+      }
+      setNextBatch(incoming);
+
+      // Staggered 3D cube roll across the 4 cards
+      [0, 1, 2, 3].forEach((slot, i) => {
+        setTimeout(() => {
+          setRollingSlots((prev) => {
+            const copy = [...prev];
+            copy[slot] = true;
+            return copy;
+          });
+        }, i * 90);
+      });
+
+      // Commit after all 4 cards have finished their 3D cube turn
+      setTimeout(() => {
+        batchIndexRef.current = nextIdx;
+        setCurrentBatch(incoming);
+        setRollingSlots([false, false, false, false]);
+
+        const futureIdx = (nextIdx + 4) % FACULTY_COORDINATORS.length;
+        const future: FacultyMember[] = [];
+        for (let i = 0; i < 4; i++) {
+          future.push(FACULTY_COORDINATORS[(futureIdx + i) % FACULTY_COORDINATORS.length]);
+        }
+        setNextBatch(future);
+      }, 650 + 3 * 90 + 50);
+    }, 3400);
+
+    return () => clearInterval(interval);
+  }, [isPaused]);
+
+  return (
+    <div
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6 md:gap-7 lg:gap-8"
+    >
+      {[0, 1, 2, 3].map((slot) => (
+        <FacultyCubeCardSlot
+          key={slot}
+          current={currentBatch[slot] || FACULTY_COORDINATORS[slot]}
+          next={nextBatch[slot] || FACULTY_COORDINATORS[(slot + 4) % FACULTY_COORDINATORS.length]}
+          isRolling={rollingSlots[slot]}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FacultyCubeCardSlot({
+  current,
+  next,
+  isRolling,
+}: {
+  current: FacultyMember;
+  next: FacultyMember;
+  isRolling: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [depth, setDepth] = useState(150);
+
+  useEffect(() => {
+    const updateDepth = () => {
+      if (containerRef.current) {
+        const h = containerRef.current.offsetHeight;
+        if (h > 0) setDepth(Math.round(h / 2));
+      }
+    };
+    updateDepth();
+    window.addEventListener("resize", updateDepth);
+    return () => window.removeEventListener("resize", updateDepth);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full rounded-2xl"
+      style={{ perspective: "1400px" }}
+    >
+      <div
+        className="relative w-full rounded-2xl"
+        style={{
+          transformStyle: "preserve-3d",
+          transform: isRolling
+            ? `translateZ(-${depth}px) rotateX(-90deg)`
+            : `translateZ(-${depth}px) rotateX(0deg)`,
+          transition: isRolling
+            ? "transform 0.65s cubic-bezier(0.33, 1, 0.68, 1)"
+            : "none",
+        }}
+      >
+        {/* FRONT FACE OF CUBE */}
+        <div
+          className="w-full rounded-2xl glass glass-hover overflow-hidden border border-white/15 bg-[#0a0708] shadow-2xl"
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transform: `rotateX(0deg) translateZ(${depth}px)`,
+          }}
+        >
+          <FacultyCardBody faculty={current} />
+        </div>
+
+        {/* BOTTOM / INCOMING FACE OF CUBE */}
+        <div
+          className="absolute inset-0 w-full rounded-2xl glass glass-hover overflow-hidden border border-white/15 bg-[#0a0708] shadow-2xl"
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transform: `rotateX(90deg) translateZ(${depth}px)`,
+          }}
+        >
+          <FacultyCardBody faculty={next} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FacultyCardBody({ faculty }: { faculty: FacultyMember }) {
+  return (
+    <Link
+      href="/coordinator"
+      className="block w-full text-left"
+      aria-label={`${faculty.name} - View Faculty Coordinators`}
+    >
+      <div className="relative overflow-hidden aspect-[4/5] bg-[#0c0809]">
+        {faculty.image ? (
+          <img
+            src={faculty.image}
+            alt={faculty.name}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
+            <span className="display text-2xl font-bold text-[#252525] sm:text-3xl md:text-4xl">
+              {faculty.name
+                .split(" ")
+                .map((name) => name[0])
+                .slice(0, 2)
+                .join("")}
+            </span>
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-transparent" />
+
+        <div className="absolute top-2 right-2 rounded border border-white/10 bg-black/60 px-1.5 py-0.5 text-[8px] font-mono text-[#D6C8C8] backdrop-blur">
+          {faculty.department}
+        </div>
+      </div>
+
+      <div className="p-1.5 sm:p-3 md:p-4 lg:p-5">
+        <h3 className="display break-words text-[9px] font-semibold leading-tight tracking-tight text-white sm:text-sm md:text-base lg:text-lg">
+          {faculty.name}
+        </h3>
+        <div className="mt-1 break-words text-[7px] leading-tight text-[#B52A32] sm:text-xs">
+          {faculty.role}
+        </div>
+        {faculty.qualification && (
+          <div className="mt-1 break-words text-[8px] leading-tight text-[#A8A8A8] sm:text-[10px] md:text-[11px]">
+            {faculty.qualification}
+          </div>
+        )}
+        <div className="mt-1 break-words text-[8px] leading-tight text-[#A8A8A8] sm:text-[10px] md:text-[11px]">
+          Dept. of {faculty.department}
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -193,7 +388,7 @@ function StudentCarousel({ coordinators }: { coordinators: Coordinator[] }) {
   return (
     <div
       className="relative overflow-hidden"
-      style={{ "--gap": "12px", "--card-w": "clamp(140px, 28vw, 220px)" } as React.CSSProperties}
+      style={{ "--gap": "18px", "--card-w": "clamp(145px, 26vw, 220px)" } as React.CSSProperties}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -239,23 +434,24 @@ function CoordinatorCard({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const hasContact = Boolean(coordinator.email || coordinator.phone);
+  const targetPage = coordinator.type === "FACULTY" ? "/coordinator" : "/crew";
 
-  function openContact() {
+  function openContact(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
     if (hasContact) dialogRef.current?.showModal();
   }
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-lg glass glass-hover transition-all duration-300 ${
+      className={`group relative overflow-hidden rounded-xl border border-white/15 bg-[#0a0708] glass glass-hover shadow-xl transition-all duration-300 ${
         coordinator.isLead ? "md:col-span-2 md:row-span-1" : ""
       }`}
     >
-      <button
-        type="button"
-        onClick={openContact}
-        disabled={!hasContact}
-        aria-label={hasContact ? `View contact details for ${coordinator.name}` : coordinator.name}
-        className="block w-full text-left disabled:cursor-default"
+      <Link
+        href={targetPage}
+        className="block w-full text-left"
+        aria-label={`${coordinator.name} - View ${coordinator.type === "FACULTY" ? "Coordinator" : "Crew"} details`}
       >
         <div
           className={`relative overflow-hidden ${
@@ -308,12 +504,16 @@ function CoordinatorCard({
             </div>
           )}
           {hasContact && (
-            <div className="mono mt-2 text-[7px] uppercase tracking-widest text-[#B52A32] sm:text-[9px]">
+            <button
+              type="button"
+              onClick={openContact}
+              className="mono mt-2 block text-[7px] uppercase tracking-widest text-[#B52A32] hover:text-[#F07C84] transition-colors sm:text-[9px]"
+            >
               View contact
-            </div>
+            </button>
           )}
         </div>
-      </button>
+      </Link>
 
       {hasContact && (
         <dialog
@@ -390,7 +590,7 @@ function DevelopingTeam() {
 
       <div
         className="relative overflow-hidden"
-        style={{ "--gap": "12px", "--card-w": "clamp(150px, 32vw, 240px)" } as React.CSSProperties}
+        style={{ "--gap": "18px", "--card-w": "clamp(155px, 28vw, 240px)" } as React.CSSProperties}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -431,14 +631,18 @@ function DevelopingTeamCard({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const hasConnections = Boolean(member.linkedin || member.github || member.phone);
 
+  function openConnections(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (hasConnections) dialogRef.current?.showModal();
+  }
+
   return (
-    <article className="group relative overflow-hidden rounded-lg glass glass-hover transition-all duration-300">
-      <button
-        type="button"
-        onClick={() => hasConnections && dialogRef.current?.showModal()}
-        disabled={!hasConnections}
-        className="block w-full text-left disabled:cursor-default"
-        aria-label={hasConnections ? `View contact details for ${member.name}` : member.name}
+    <article className="group relative overflow-hidden rounded-xl border border-white/15 bg-[#0a0708] glass glass-hover shadow-xl transition-all duration-300">
+      <Link
+        href="/crew"
+        className="block w-full text-left"
+        aria-label={`${member.name} - View Crew page`}
       >
         <div className="relative aspect-[4/5] overflow-hidden">
           <img
@@ -457,12 +661,16 @@ function DevelopingTeamCard({
             {member.role}
           </div>
           {hasConnections && (
-            <div className="mono mt-2 text-[6px] uppercase tracking-widest text-[#B52A32] sm:text-[8px]">
+            <button
+              type="button"
+              onClick={openConnections}
+              className="mono mt-2 block text-[6px] uppercase tracking-widest text-[#B52A32] hover:text-[#F07C84] transition-colors sm:text-[8px]"
+            >
               View links
-            </div>
+            </button>
           )}
         </div>
-      </button>
+      </Link>
 
       {hasConnections && (
         <dialog

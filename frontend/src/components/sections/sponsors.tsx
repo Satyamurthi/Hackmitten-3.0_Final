@@ -82,10 +82,11 @@ export function Sponsors() {
     <section id="sponsors" className="relative border-t border-white/5 py-16 md:py-24">
       <div className="mx-auto max-w-7xl px-5 md:px-10">
 
-        <div className="mb-10 text-center md:mb-16">
-          <div className="mono mb-4 text-xs uppercase tracking-[0.3em] text-[#B52A32]">/ Partners</div>
-          <h2 className="display text-3xl font-bold leading-[0.95] tracking-tight text-white sm:text-5xl md:text-7xl">
-            BACKED BY<br /><span className="text-[#A8A8A8]">THE BEST.</span>
+        <div className="mb-10 md:mb-16">
+          <h2 className="display text-4xl sm:text-6xl md:text-7xl font-bold leading-[0.95] tracking-tight text-white">
+            BACKED BY
+            <br />
+            <span className="text-[#A8A8A8]">THE BEST.</span>
           </h2>
         </div>
 
@@ -109,15 +110,15 @@ export function Sponsors() {
               {departmentLogos.map((department) => {
                 const logo = getDepartmentLogo(department);
                 return (
-                  <div key={department.id} className="flex w-28 flex-col items-center sm:w-32 md:w-40">
-                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-lg sm:h-28 sm:w-28 md:h-36 md:w-36">
+                  <div key={department.id} className="flex w-32 flex-col items-center sm:w-40 md:w-48">
+                    <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-white p-3 shadow-xl sm:h-36 sm:w-36 md:h-44 md:w-44 transition-transform hover:scale-105">
                       {logo ? (
                         <img src={logo} alt={`${department.name} logo`} loading="lazy" className="h-full w-full rounded-full object-contain" />
                       ) : (
-                        <span className="text-center text-xs sm:text-sm font-bold text-black">{department.name}</span>
+                        <span className="text-center text-sm sm:text-base font-bold text-black">{department.name}</span>
                       )}
                     </div>
-                    <span className="mono mt-3 sm:mt-4 text-center text-[10px] sm:text-xs uppercase tracking-widest text-[#A8A8A8]">{department.name}</span>
+                    <span className="mono mt-3 sm:mt-4 text-center text-xs sm:text-sm uppercase tracking-widest text-[#A8A8A8] font-medium">{department.name}</span>
                   </div>
                 );
               })}
@@ -131,55 +132,61 @@ export function Sponsors() {
 }
 
 /* ================================================================
-   SPONSOR GLOBE
+   3D HOLOGRAPHIC APP SPHERE (DNA LAUNCHER STYLE 360° SQUIRCLE ORBIT)
 ================================================================ */
 
 function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(500);
-
   const [mounted, setMounted] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // 3D Rotation Angles (Yaw = Y-axis horizontal, Pitch = X-axis vertical)
   const [yaw, setYaw] = useState(0);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [pitch, setPitch] = useState(0.15);
 
   const rafRef = useRef<number>(0);
   const yawRef = useRef(0);
-  const velRef = useRef(0.18);
+  const pitchRef = useRef(0.15);
+  const velXRef = useRef(0);
+  const velYRef = useRef(0);
+
   const dragRef = useRef({
     active: false,
     startX: 0,
     startY: 0,
     lastX: 0,
-    prevX: 0,
+    lastY: 0,
     prevT: 0,
-    isDraggingHorizontally: false,
+    isDragging: false,
   });
-  const pitch = 0.42;
 
-  // Responsive dimensions calculated from available container width
-  const n = Math.max(1, sponsors.length);
-  const SIZE = Math.max(260, Math.min(containerWidth, 540));
-  const R = Math.round(SIZE * 0.35);
-  const LOGO_MAX = Math.max(38, Math.min(88, Math.round((SIZE * 0.165) * (n > 5 ? Math.max(0.7, 5 / n) : 1))));
-  const positions = sponsors.map((_, i) => ({
-    phi: Math.acos(1 - (2 * (i + 0.5)) / n),
-    theta: Math.PI * (1 + Math.sqrt(5)) * i,
-  }));
+  // Responsive dimensions - enlarged for maximum visual impact & crisp logos
+  const SIZE = Math.max(340, Math.min(containerWidth, 680));
+  const R = Math.round(SIZE * 0.42);
+  const ICON_SIZE = Math.max(54, Math.min(92, Math.round(SIZE * 0.14)));
 
-  // Track container width dynamically for perfect responsiveness on mobile / resize
+  // Dense 28-point Fibonacci sphere distribution for rich, seamless 3D volume
+  const totalPoints = 28;
+  const sphereSlots = Array.from({ length: totalPoints }, (_, i) => {
+    const phi = Math.acos(1 - (2 * (i + 0.5)) / totalPoints);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    const sponsor = sponsors[i % sponsors.length];
+    return { id: `sphere-slot-${i}`, phi, theta, sponsor };
+  });
+
+  // Track responsive container width
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     if (!containerRef.current) return;
 
     const el = containerRef.current;
     const updateSize = () => {
-      const w = el.clientWidth || window.innerWidth - 32;
-      setContainerWidth(Math.min(w, 540));
+      const w = el.clientWidth || (typeof window !== "undefined" ? window.innerWidth - 32 : 680);
+      setContainerWidth(Math.min(w, 720));
     };
 
     updateSize();
-
     const ro = new ResizeObserver(updateSize);
     ro.observe(el);
     window.addEventListener("resize", updateSize);
@@ -190,57 +197,86 @@ function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
     };
   }, []);
 
+  // Physics animation loop: ONLY moves when dragged or when coasting from user flick (ZERO auto-rotation)
   useEffect(() => {
     if (!mounted) return;
     let last = performance.now();
+
     function frame(now: number) {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
+
       if (!dragRef.current.active) {
-        velRef.current *= 0.95;
-        yawRef.current += (velRef.current + 0.6) * dt;
+        // Friction decay on flick velocity
+        velXRef.current *= 0.91;
+        velYRef.current *= 0.91;
+
+        // Stop completely when velocity is minimal (NO continuous self-rotation)
+        if (Math.abs(velXRef.current) < 0.0001) velXRef.current = 0;
+        if (Math.abs(velYRef.current) < 0.0001) velYRef.current = 0;
+
+        // Only rotate if user has flicked it
+        if (velXRef.current !== 0 || velYRef.current !== 0) {
+          yawRef.current += velXRef.current * dt;
+          pitchRef.current += velYRef.current * dt;
+          pitchRef.current = Math.max(-1.4, Math.min(1.4, pitchRef.current));
+        }
       }
+
       setYaw(yawRef.current);
+      setPitch(pitchRef.current);
       rafRef.current = requestAnimationFrame(frame);
     }
+
     rafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafRef.current);
   }, [mounted]);
 
+  // Pointer drag interactions (supports desktop mouse + mobile touch)
   function onPointerDown(e: React.PointerEvent) {
     dragRef.current = {
       active: true,
       startX: e.clientX,
       startY: e.clientY,
       lastX: e.clientX,
-      prevX: e.clientX,
+      lastY: e.clientY,
       prevT: performance.now(),
-      isDraggingHorizontally: false,
+      isDragging: false,
     };
-    velRef.current = 0;
+    velXRef.current = 0;
+    velYRef.current = 0;
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current.active) return;
-    const dx = e.clientX - dragRef.current.lastX;
-    const totalDx = Math.abs(e.clientX - dragRef.current.startX);
-    const totalDy = Math.abs(e.clientY - dragRef.current.startY);
 
-    // If gesture is horizontal or mouse, lock pointer capture for smooth rotation
-    if (!dragRef.current.isDraggingHorizontally && totalDx > 5 && totalDx > totalDy) {
-      dragRef.current.isDraggingHorizontally = true;
+    const dx = e.clientX - dragRef.current.lastX;
+    const dy = e.clientY - dragRef.current.lastY;
+    const totalDist = Math.hypot(e.clientX - dragRef.current.startX, e.clientY - dragRef.current.startY);
+
+    if (!dragRef.current.isDragging && totalDist > 4) {
+      dragRef.current.isDragging = true;
       try {
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       } catch {}
     }
 
-    if (dragRef.current.isDraggingHorizontally || e.pointerType === "mouse") {
-      const dt = (performance.now() - dragRef.current.prevT) / 1000 || 0.016;
-      velRef.current = (dx / dt) * 0.003;
-      yawRef.current += dx * 0.005;
-      dragRef.current.prevX = dragRef.current.lastX;
+    if (dragRef.current.isDragging) {
+      const now = performance.now();
+      const dt = Math.max(0.008, (now - dragRef.current.prevT) / 1000);
+
+      // Direct 1:1 trackball spherical rotation
+      yawRef.current += dx * 0.007;
+      pitchRef.current -= dy * 0.007;
+      pitchRef.current = Math.max(-1.4, Math.min(1.4, pitchRef.current));
+
+      // Velocity for smooth release flick
+      velXRef.current = (dx / dt) * 0.0035;
+      velYRef.current = (-dy / dt) * 0.0035;
+
       dragRef.current.lastX = e.clientX;
-      dragRef.current.prevT = performance.now();
+      dragRef.current.lastY = e.clientY;
+      dragRef.current.prevT = now;
     }
   }
 
@@ -251,27 +287,59 @@ function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
     } catch {}
   }
 
-  function project(phi: number, theta: number, currentYaw: number) {
+  // 3D Perspective Projection + Surface Normal Curvature
+  function project(phi: number, theta: number, curYaw: number, curPitch: number) {
     const x0 = R * Math.sin(phi) * Math.cos(theta);
     const y0 = R * Math.cos(phi);
     const z0 = R * Math.sin(phi) * Math.sin(theta);
-    const x1 = x0 * Math.cos(currentYaw) + z0 * Math.sin(currentYaw);
-    const z1 = -x0 * Math.sin(currentYaw) + z0 * Math.cos(currentYaw);
-    const y2 = y0 * Math.cos(pitch) - z1 * Math.sin(pitch);
-    const z2 = y0 * Math.sin(pitch) + z1 * Math.cos(pitch);
-    const raw = (z2 + R * 1.6) / (R * 2.6);
-    const scale = Math.pow(Math.max(0, raw), 0.45);
-    return { sx: x1, sy: y2, scale, z: z2 };
+
+    // Rotate around Y-axis (Yaw)
+    const cosY = Math.cos(curYaw);
+    const sinY = Math.sin(curYaw);
+    const x1 = x0 * cosY + z0 * sinY;
+    const y1 = y0;
+    const z1 = -x0 * sinY + z0 * cosY;
+
+    // Rotate around X-axis (Pitch)
+    const cosP = Math.cos(curPitch);
+    const sinP = Math.sin(curPitch);
+    const x2 = x1;
+    const y2 = y1 * cosP - z1 * sinP;
+    const z2 = y1 * sinP + z1 * cosP;
+
+    // Surface normal vector for spherical edge tilt
+    const normX = x2 / R;
+    const normY = y2 / R;
+
+    // Perspective projection
+    const camDist = R * 2.5;
+    const perspective = camDist / (camDist - z2);
+    const scale = Math.max(0.42, Math.min(1.15, perspective));
+    const opacity = Math.max(0.25, Math.min(1, (z2 + R * 1.15) / (R * 2.15)));
+
+    return {
+      sx: x2,
+      sy: y2,
+      normX,
+      normY,
+      scale,
+      opacity,
+      z: z2,
+    };
   }
 
-  const projected = positions
-    .map(({ phi, theta }, i) => ({ ...project(phi, theta, yaw), sponsor: sponsors[i] }))
+  const projectedItems = sphereSlots
+    .map((slot, index) => ({
+      ...slot,
+      index,
+      ...project(slot.phi, slot.theta, yaw, pitch),
+    }))
     .sort((a, b) => a.z - b.z);
 
   return (
-    <div ref={containerRef} className="w-full flex flex-col items-center">
+    <div ref={containerRef} className="w-full flex flex-col items-center select-none">
       <div
-        className="relative mx-auto cursor-grab select-none active:cursor-grabbing touch-pan-y"
+        className="relative mx-auto cursor-grab active:cursor-grabbing touch-none select-none"
         style={{
           width: SIZE,
           height: SIZE,
@@ -280,87 +348,99 @@ function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
-        <svg className="pointer-events-none absolute inset-0" width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`}>
-          <defs>
-            <radialGradient id="gg" cx="50%" cy="45%" r="55%">
-              <stop offset="0%" stopColor="#B52A32" stopOpacity="0.12" />
-              <stop offset="60%" stopColor="#B52A32" stopOpacity="0.03" />
-              <stop offset="100%" stopColor="#000" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="shine" cx="38%" cy="32%" r="45%">
-              <stop offset="0%" stopColor="#fff" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R + Math.max(8, SIZE * 0.025)} fill="none" stroke="#6b7280" strokeOpacity="0.12" strokeWidth={Math.max(8, SIZE * 0.025)} />
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="url(#gg)" />
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="url(#shine)" />
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#9ca3af" strokeOpacity="0.5" strokeWidth="2" />
-          {[-0.65, -0.35, 0, 0.35, 0.65].map((t, i) => {
-            const rx2 = R * Math.sqrt(1 - t * t);
-            return <ellipse key={i} cx={SIZE / 2} cy={SIZE / 2 + R * t} rx={rx2} ry={rx2 * 0.28} fill="none" stroke="#9ca3af" strokeOpacity="0.22" strokeWidth="1" />;
-          })}
-          {[0, 45, 90, 135].map((deg, i) => (
-            <ellipse key={i} cx={SIZE / 2} cy={SIZE / 2}
-              rx={Math.max(1, R * Math.abs(Math.cos(deg * Math.PI / 180)))}
-              ry={R} fill="none" stroke="#9ca3af" strokeOpacity="0.22" strokeWidth="1" />
-          ))}
-        </svg>
+        {/* Subtle center ambient core glow (space wallpaper shines through) */}
+        <div
+          className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            width: R * 1.5,
+            height: R * 1.5,
+            background:
+              "radial-gradient(circle, rgba(255,255,255,0.14) 0%, rgba(216,58,67,0.08) 38%, transparent 70%)",
+          }}
+        />
 
-        {mounted && projected.map(({ sx, sy, scale, sponsor }) => {
-          const s = Math.max(0.18, Math.min(1, scale));
-          const logoSize = Math.round(LOGO_MAX * s);
-          const isFront = s > 0.7;
-          const isHov = hovered === sponsor.id;
-          return (
-            <div
-              key={sponsor.id}
-              onMouseEnter={() => setHovered(sponsor.id)}
-              onMouseLeave={() => setHovered(null)}
-              className="absolute flex items-center justify-center rounded-full bg-white shadow-sm"
-              style={{
-                width: logoSize,
-                height: logoSize,
-                left: Math.round(SIZE / 2 + sx - logoSize / 2),
-                top: Math.round(SIZE / 2 + sy - logoSize / 2),
-                opacity: 0.15 + s * 0.85,
-                zIndex: Math.round(s * 100),
-                boxShadow: isFront
-                  ? `0 0 ${isHov ? 28 : 16}px ${isHov ? 6 : 3}px rgba(181,42,50,${isHov ? 0.75 : 0.5}), 0 4px 16px rgba(0,0,0,0.6)`
-                  : "0 2px 6px rgba(0,0,0,0.3)",
-                transition: "box-shadow 0.2s",
-              }}
-            >
-              {sponsor.logoUrl ? (
-                <img
-                  src={getSponsorLogoUrl(sponsor.logoUrl)}
-                  alt={sponsor.name}
-                  draggable={false}
-                  className="h-[76%] w-[76%] object-contain"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.dataset.fallback) {
-                      target.dataset.fallback = "true";
-                      target.src = sponsor.logoUrl;
-                    }
-                  }}
-                />
-              ) : (
-                <span className="px-1 text-center text-[7px] sm:text-[8px] font-bold leading-tight text-black">{sponsor.name}</span>
-              )}
-              {isHov && (
-                <div className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white">
-                  {sponsor.name}
+        {/* 3D Floating Squircle App Icons conforming to sphere surface */}
+        {mounted &&
+          projectedItems.map(({ id, sx, sy, normX, normY, scale, opacity, z, sponsor, index }) => {
+            const logoSize = Math.round(ICON_SIZE * scale);
+            const isFront = z > 0;
+            const isHov = hoveredIndex === index;
+
+            return (
+              <div
+                key={id}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onClick={() => {
+                  if (sponsor.websiteUrl) {
+                    window.open(sponsor.websiteUrl, "_blank", "noopener,noreferrer");
+                  }
+                }}
+                className={`absolute flex items-center justify-center rounded-[22%] bg-white select-none transition-all ${
+                  sponsor.websiteUrl ? "cursor-pointer" : ""
+                }`}
+                style={{
+                  width: logoSize,
+                  height: logoSize,
+                  left: Math.round(SIZE / 2 + sx - logoSize / 2),
+                  top: Math.round(SIZE / 2 + sy - logoSize / 2),
+                  opacity: isHov ? 1 : opacity,
+                  zIndex: Math.round(scale * 120),
+                  boxShadow: isHov
+                    ? "0 0 28px rgba(216,58,67,0.9), 0 8px 24px rgba(0,0,0,0.8)"
+                    : isFront
+                    ? `0 6px 18px rgba(0,0,0,${0.55 * scale}), 0 0 ${Math.round(10 * scale)}px rgba(216,58,67,${0.25 * scale})`
+                    : "0 2px 8px rgba(0,0,0,0.4)",
+                  transform: isHov
+                    ? `scale(1.22) rotateY(${normX * 36}deg) rotateX(${-normY * 36}deg)`
+                    : `scale(1) rotateY(${normX * 36}deg) rotateX(${-normY * 36}deg)`,
+                  transformOrigin: "center center",
+                  transition: "transform 0.15s ease-out, box-shadow 0.15s ease-out",
+                }}
+                title={sponsor.name}
+              >
+                {/* Clean squircle app container */}
+                <div className="h-full w-full p-2 flex items-center justify-center overflow-hidden rounded-[22%]">
+                  {sponsor.logoUrl ? (
+                    <img
+                      src={getSponsorLogoUrl(sponsor.logoUrl)}
+                      alt={sponsor.name}
+                      draggable={false}
+                      className="h-full w-full object-contain pointer-events-none"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.fallback) {
+                          target.dataset.fallback = "true";
+                          target.src = sponsor.logoUrl;
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-center font-bold text-[9px] leading-tight text-gray-900 line-clamp-2">
+                      {sponsor.name}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Floating Sponsor Info Tooltip on Hover */}
+                {isHov && (
+                  <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/90 border border-white/20 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-white shadow-xl z-50 flex items-center gap-1.5">
+                    <span className="font-bold text-[#D83A43]">{sponsor.name}</span>
+                    <span className="text-[#A8A8A8] text-[8px]">({sponsor.tier})</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </div>
 
-      <p className="mono mt-2 text-[9px] uppercase tracking-widest text-[#A8A8A8]/40">drag to rotate</p>
+      {/* Orbit Instruction */}
+      <div className="mt-4 flex items-center gap-2 mono text-[10px] uppercase tracking-widest text-[#A8A8A8]/60">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D83A43]" />
+        <span>360° Sphere • Drag to rotate</span>
+      </div>
     </div>
   );
 }

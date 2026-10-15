@@ -232,7 +232,10 @@ export function FoodScannerApp() {
               <History size={12} /> History
             </button>
             <button
-              onClick={() => signOut({ callbackUrl: "/login", redirect: true })}
+              onClick={async () => {
+                await signOut({ redirect: false });
+                window.location.href = "/login";
+              }}
               className="rounded-full border border-white/15 p-2 text-white hover:border-[#B52A32]"
               aria-label="Sign out"
             >

@@ -329,7 +329,8 @@ function DashboardContent() {
   }, [fetchDashboard]);
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/login?role=PARTICIPANT" });
+    await signOut({ redirect: false });
+    window.location.href = "/login?role=PARTICIPANT";
   };
 
   if (loading) {

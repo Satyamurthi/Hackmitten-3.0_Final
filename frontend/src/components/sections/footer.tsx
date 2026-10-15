@@ -1,10 +1,13 @@
 import Image from "next/image";
 
 const quickLinks = [
-  { label: "Home", href: "/#home" },
+  { label: "Home", href: "/" },
   { label: "About", href: "/about" },
-  { label: "Gallery", href: "/#gallery" },
-  { label: "Crew", href: "/#crew" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Coordinator", href: "/coordinator" },
+  { label: "Crew", href: "/crew" },
+  { label: "Venue", href: "/venue" },
+  { label: "Accommodation", href: "/accommodation" },
 ];
 
 const socialLinks = [
@@ -92,9 +95,13 @@ export function Footer() {
               <h3 className="mono mb-3 text-[10px] uppercase tracking-[0.27em] text-[#E07179]">
                 Venue
               </h3>
-              <p className="max-w-60 text-sm leading-relaxed text-[#D6C8C8]">
+              <a
+                href="/venue"
+                className="max-w-60 block text-sm leading-relaxed text-[#D6C8C8] hover:text-white transition-colors group"
+              >
                 Maharaja Institute of Technology Thandavapura
-              </p>
+                <span className="inline-block ml-1 text-[#E07179] transition-transform group-hover:translate-x-1">→</span>
+              </a>
             </div>
 
             <nav aria-label="Footer social links">

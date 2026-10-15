@@ -48,7 +48,7 @@ const DEFAULT_EVENT_STATE: EventStateResponse = {
   timezone: "Asia/Kolkata",
 };
 
-export function Countdown() {
+export function Countdown({ className = "mt-4 sm:mt-5" }: { className?: string } = {}) {
   const { data: rawData } = useQuery<EventStateResponse>({
     queryKey: ["event-state"],
     queryFn: async () => {
@@ -92,7 +92,7 @@ export function Countdown() {
     const remaining = getRemaining(data.eventEndIso, now);
 
     return (
-      <div suppressHydrationWarning className="mt-8 flex flex-col items-center gap-2">
+      <div suppressHydrationWarning className={`${className} flex flex-col items-center gap-2`}>
         <div className="flex items-center gap-3">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D83A43] opacity-75" />
@@ -120,7 +120,7 @@ export function Countdown() {
 
   if (data.state === "ENDED") {
     return (
-      <div className="mt-8 display text-base md:text-xl font-bold text-[#A8A8A8]">
+      <div className={`${className} display text-base md:text-xl font-bold text-[#A8A8A8]`}>
         THE MISSION IS COMPLETE.
       </div>
     );
@@ -128,7 +128,7 @@ export function Countdown() {
 
   if (!data.eventStartIso) {
     return (
-      <div className="mt-8 mono text-xs uppercase tracking-[0.25em] text-[#A8A8A8]">
+      <div className={`${className} mono text-xs uppercase tracking-[0.25em] text-[#A8A8A8]`}>
         EVENT DATE TBA
       </div>
     );
@@ -144,7 +144,7 @@ export function Countdown() {
   ];
 
   return (
-    <div suppressHydrationWarning className="mt-8 flex items-center justify-center gap-2 md:gap-4">
+    <div suppressHydrationWarning className={`${className} flex items-center justify-center gap-2 md:gap-4`}>
       {units.map((unit, index) => (
         <div key={unit.label} className="flex items-center gap-2 md:gap-4">
           <div className="flex flex-col items-center">

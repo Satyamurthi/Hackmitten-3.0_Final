@@ -108,7 +108,10 @@ function AdminShellInner({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => {
-                import("next-auth/react").then((m) => m.signOut({ callbackUrl: "/login", redirect: true }));
+                import("next-auth/react").then(async (m) => {
+                  await m.signOut({ redirect: false });
+                  window.location.href = "/login";
+                });
               }}
               className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[#A8A8A8] hover:text-[#D83A43] hover:bg-white/5 whitespace-nowrap w-full text-left"
             >

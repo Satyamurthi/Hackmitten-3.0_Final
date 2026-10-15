@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { resolveGalleryItems } from "@/data/gallery";
 
 type GalleryItem = {
@@ -13,12 +13,14 @@ type GalleryItem = {
 };
 
 export function Gallery() {
+  const router = useRouter();
   const items: GalleryItem[] = resolveGalleryItems();
 
   const [currAngle, setCurrAngle] = useState(0);
   const [vw, setVw] = useState(375);
   const pausedRef = useRef(false);
-  const touchStartX = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
     const measure = () => setVw(window.innerWidth);
@@ -59,56 +61,44 @@ export function Gallery() {
     return () => window.clearInterval(timer);
   }, [items.length, angleStep]);
 
-  const onTouchStart = (e: React.TouchEvent) => {
+  const onPointerDown = (clientX: number) => {
     pausedRef.current = true;
-    touchStartX.current = e.touches[0].clientX;
+    dragStartXRef.current = clientX;
+    isDraggingRef.current = false;
   };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 40) {
-      if (dx < 0) goNext();
-      else goPrev();
+
+  const onPointerMove = (clientX: number) => {
+    if (dragStartXRef.current === null) return;
+    if (Math.abs(clientX - dragStartXRef.current) > 10) {
+      isDraggingRef.current = true;
     }
-    touchStartX.current = null;
-    window.setTimeout(() => { pausedRef.current = false; }, 2400);
+  };
+
+  const onPointerUp = (clientX: number) => {
+    if (dragStartXRef.current !== null && isDraggingRef.current) {
+      const dx = clientX - dragStartXRef.current;
+      if (Math.abs(dx) > 35) {
+        if (dx < 0) goNext();
+        else goPrev();
+      }
+    }
+    dragStartXRef.current = null;
+    window.setTimeout(() => {
+      isDraggingRef.current = false;
+      pausedRef.current = false;
+    }, 2400);
   };
 
   return (
     <section id="gallery" className="relative py-12 md:py-24">
 
       {/* ── Header ── */}
-      <div className="mx-auto max-w-7xl px-4 md:px-10 mb-4 md:mb-12">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="mono text-xs uppercase tracking-[0.3em] text-[#B52A32] mb-4">
-              / Gallery
-            </div>
-            <h2 className="display text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[0.95]">
-              PREVIOUS
-              <br />
-              <span className="text-[#A8A8A8]">MISSIONS.</span>
-            </h2>
-          </div>
-          {items.length > 1 && (
-            <div className="flex gap-2">
-              <button
-                onClick={goPrev}
-                aria-label="Previous image"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white hover:border-[#B52A32] hover:bg-white/5 transition-all"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                onClick={goNext}
-                aria-label="Next image"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white hover:border-[#B52A32] hover:bg-white/5 transition-all"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
-        </div>
+      <div className="mx-auto max-w-7xl px-4 md:px-10 mb-6 md:mb-12">
+        <h2 className="display text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[0.95]">
+          PREVIOUS
+          <br />
+          <span className="text-[#A8A8A8]">MISSIONS.</span>
+        </h2>
       </div>
 
       {items.length === 0 ? (
@@ -119,12 +109,21 @@ export function Gallery() {
         <>
           {/* ── 3D Carousel ── */}
           <div
-            className="relative select-none"
+            className="relative select-none cursor-grab active:cursor-grabbing"
             style={{ height: stageH, perspective: 1000 }}
-            onTouchStart={onTouchStart}
-            onTouchEnd={onTouchEnd}
+            onTouchStart={(e) => onPointerDown(e.touches[0].clientX)}
+            onTouchMove={(e) => onPointerMove(e.touches[0].clientX)}
+            onTouchEnd={(e) => onPointerUp(e.changedTouches[0].clientX)}
+            onMouseDown={(e) => onPointerDown(e.clientX)}
+            onMouseMove={(e) => onPointerMove(e.clientX)}
+            onMouseUp={(e) => onPointerUp(e.clientX)}
             onMouseEnter={() => { pausedRef.current = true; }}
-            onMouseLeave={() => { pausedRef.current = false; }}
+            onMouseLeave={() => {
+              if (!isDraggingRef.current) {
+                pausedRef.current = false;
+                dragStartXRef.current = null;
+              }
+            }}
           >
             {/* centring anchor */}
             <div style={{
@@ -147,10 +146,16 @@ export function Gallery() {
                     <div
                       key={item.id}
                       onClick={() => {
-                        pausedRef.current = true;
-                        setCurrAngle(-angle);
-                        window.setTimeout(() => { pausedRef.current = false; }, 2400);
+                        if (isDraggingRef.current) return;
+                        if (isActive) {
+                          router.push("/gallery");
+                        } else {
+                          pausedRef.current = true;
+                          setCurrAngle(-angle);
+                          window.setTimeout(() => { pausedRef.current = false; }, 2400);
+                        }
                       }}
+                      title={isActive ? "Click to open full gallery archive" : `Rotate to ${item.title}`}
                       style={{
                         position: "absolute",
                         width: cardW,
@@ -202,23 +207,6 @@ export function Gallery() {
                         background: "linear-gradient(135deg, rgba(139,30,36,0.14) 0%, transparent 60%)",
                       }} />
 
-                      {/* year badge */}
-                      {item.year && (
-                        <div style={{
-                          position: "absolute", top: 10, left: 10,
-                          fontFamily: "monospace", fontSize: 9,
-                          letterSpacing: "0.2em", textTransform: "uppercase",
-                          padding: "3px 8px", borderRadius: 4,
-                          backdropFilter: "blur(6px)",
-                          background: isActive ? "#B52A32" : "rgba(0,0,0,0.55)",
-                          color: isActive ? "#fff" : "#B52A32",
-                          border: isActive ? "none" : "1px solid rgba(181,42,50,0.35)",
-                          transition: "all 0.5s ease",
-                        }}>
-                          {item.year}
-                        </div>
-                      )}
-
                       {/* active glow ring inset */}
                       {isActive && (
                         <div style={{
@@ -235,39 +223,16 @@ export function Gallery() {
           </div>
 
           {/* ── Caption ── */}
-          <div className="mx-auto max-w-7xl px-4 md:px-10 mt-6 min-h-[44px]">
-            {items[safeActiveIdx] && (
-              <div className="transition-opacity duration-300">
-                <div className="mono text-[10px] uppercase tracking-[0.25em] text-[#B52A32]">
-                  {items[safeActiveIdx].year}
-                </div>
-                <div className="display mt-0.5 text-base md:text-lg font-semibold text-white">
-                  {items[safeActiveIdx].title}
-                </div>
-                {items[safeActiveIdx].caption && (
-                  <div className="mt-0.5 text-xs md:text-sm text-[#A8A8A8]">
-                    {items[safeActiveIdx].caption}
-                  </div>
-                )}
+          {items[safeActiveIdx] && (
+            <div className="mx-auto max-w-7xl px-4 md:px-10 mt-6 min-h-[44px] text-center transition-opacity duration-300">
+              <div className="display text-base md:text-lg font-semibold text-white">
+                {items[safeActiveIdx].title}
               </div>
-            )}
-          </div>
-
-          {/* ── Progress indicator ── */}
-          {items.length > 1 && (
-            <div className="mx-auto max-w-7xl px-4 md:px-10 mt-3 flex items-center gap-3">
-              <span className="mono text-xs text-[#A8A8A8]">
-                {String(safeActiveIdx + 1).padStart(2, "0")}
-              </span>
-              <div className="flex-1 h-px bg-white/10 relative overflow-hidden">
-                <div
-                  className="absolute top-0 left-0 h-full bg-[#B52A32] transition-all duration-500"
-                  style={{ width: `${((safeActiveIdx + 1) / items.length) * 100}%` }}
-                />
-              </div>
-              <span className="mono text-xs text-[#A8A8A8]">
-                {String(items.length).padStart(2, "0")}
-              </span>
+              {items[safeActiveIdx].caption && (
+                <div className="mt-1 text-xs md:text-sm text-[#A8A8A8] max-w-xl mx-auto">
+                  {items[safeActiveIdx].caption}
+                </div>
+              )}
             </div>
           )}
         </>

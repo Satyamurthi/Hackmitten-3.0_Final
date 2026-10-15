@@ -6,7 +6,7 @@ import { resolveSponsors } from "@/data/sponsors";
 import { getSponsorLogoUrl, SponsorItem } from "./sponsors";
 import { Sparkles, ArrowRight, Pause } from "lucide-react";
 
-export function IntroScreen() {
+export function IntroScreen({ onFinish }: { onFinish?: () => void } = {}) {
   const [stage, setStage] = useState<"visible" | "exiting" | "gone">("visible");
   const [isHolding, setIsHolding] = useState(false);
 
@@ -170,10 +170,11 @@ export function IntroScreen() {
     if (stage === "exiting") {
       const timer = setTimeout(() => {
         setStage("gone");
+        onFinish?.();
       }, 820);
       return () => clearTimeout(timer);
     }
-  }, [stage]);
+  }, [stage, onFinish]);
 
   if (stage === "gone") return null;
 

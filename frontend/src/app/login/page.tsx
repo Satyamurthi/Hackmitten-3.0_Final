@@ -56,7 +56,7 @@ function LoginForm() {
     const session = await getSession();
     const role = (session?.user as any)?.role;
     if (role === "SUPER_ADMIN") router.push("/admin");
-    else if (role === "COORDINATOR") router.push("/coordinator");
+    else if (role === "COORDINATOR") router.push("/coordinator-portal");
     else if (role === "FOOD_ADMIN") router.push("/food-admin");
     else if (role === "PARTICIPANT") router.push("/dashboard");
     else router.push("/");

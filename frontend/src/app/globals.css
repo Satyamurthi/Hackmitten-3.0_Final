@@ -422,6 +422,62 @@
   }
 }
 
+@keyframes inaugurateBurst {
+  0% {
+    opacity: 0;
+    transform: scale(0.78) translate3d(0, 30px, 0);
+    filter: blur(14px) brightness(2.2);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06) translate3d(0, -6px, 0);
+    filter: blur(0) brightness(1.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+    filter: blur(0) brightness(1);
+  }
+}
+
+@keyframes shockwaveRing {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+@keyframes heroSponsorSlowIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0) scale(0.8);
+    filter: blur(6px);
+  }
+  65% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1.03);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes heroSponsorFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 @media (max-width: 767px) {
   .hero-content-depth {
     animation-duration: 11s;
