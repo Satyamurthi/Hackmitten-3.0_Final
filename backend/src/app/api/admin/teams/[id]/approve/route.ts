@@ -123,45 +123,59 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         select: { email: true, qrToken: true, fullName: true, participantId: true, isLeader: true },
       });
 
-      let anySent = false;
+      const leader = allMembers.find((m) => m.isLeader);
       if (!baseUrl) {
         console.error("[approval-email] delivery skipped: NEXTAUTH_URL is missing", { teamId: id });
       } else {
-        for (const member of allMembers) {
-          if (!member.email || !member.qrToken) continue;
-          const passUrl = `${baseUrl}/pass/${member.qrToken}`;
-          try {
-            const emailResult = await sendEmail({
-              to: member.email,
-              subject: "Hackmitten 3.0 — Team Approved",
-              html: approvalEmailHtml({
-                participantName: member.fullName,
-                teamName: team.teamName,
-                registrationId: regId,
-                participantId: member.participantId ?? "",
-                passUrl,
-                whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
-              }),
-              text: approvalEmailText({
-                participantName: member.fullName,
-                teamName: team.teamName,
-                registrationId: regId,
-                participantId: member.participantId ?? "",
-                passUrl,
-                whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
-              }),
-            });
-            if (emailResult.success) anySent = true;
-          } catch (err) {
-            console.error(`[approval-email] delivery failed for ${member.email}`, err);
-          }
-        }
+        // Dispatch emails concurrently in background so HTTP response does not time out
+        (async () => {
+          let anySent = false;
+          const emailPromises = allMembers.map(async (member) => {
+            if (!member.email || !member.qrToken) return;
+            const passUrl = `${baseUrl}/pass/${member.qrToken}`;
+            try {
+              const emailResult = await sendEmail({
+                to: member.email,
+                subject: "Hackmitten 3.0 — Team Approved",
+                html: approvalEmailHtml({
+                  participantName: member.fullName,
+                  teamName: team.teamName,
+                  registrationId: regId,
+                  participantId: member.participantId ?? "",
+                  passUrl,
+                  whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+                  isLeader: Boolean(member.isLeader),
+                  leaderName: leader?.fullName || member.fullName,
+                }),
+                text: approvalEmailText({
+                  participantName: member.fullName,
+                  teamName: team.teamName,
+                  registrationId: regId,
+                  participantId: member.participantId ?? "",
+                  passUrl,
+                  whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+                  isLeader: Boolean(member.isLeader),
+                  leaderName: leader?.fullName || member.fullName,
+                }),
+              });
+              if (emailResult.success) anySent = true;
+            } catch (err) {
+              console.error(`[approval-email] delivery failed for ${member.email}`, err);
+            }
+          });
 
-        if (anySent) {
-          await db.team.updateMany({ where: { id, status: "APPROVED", approvalEmailSentAt: null }, data: { approvalEmailSentAt: new Date() } });
-        }
+          await Promise.allSettled(emailPromises);
+          if (anySent) {
+            await db.team.updateMany({
+              where: { id, status: "APPROVED", approvalEmailSentAt: null },
+              data: { approvalEmailSentAt: new Date() },
+            });
+          }
+        })().catch((err) => {
+          console.error("[approval-email] background dispatch failed", err);
+        });
       }
-      return NextResponse.json({ team: result.team, emailSent: anySent });
+      return NextResponse.json({ team: result.team, emailSent: true });
     } else {
       console.log("[approval-email] duplicate suppressed", { teamId: id, reason: "re-approval" });
     }

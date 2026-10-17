@@ -116,7 +116,7 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
     setBusy(true); setError(null);
     try {
       const r = await fetch(`/api/admin/payments/${team.payment.id}/verify`, { method: "POST" });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Failed");
       qc.invalidateQueries({ queryKey: ["admin-registration", id] });
       qc.invalidateQueries({ queryKey: ["admin-registrations"] });
@@ -154,7 +154,7 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
     setBusy(true); setError(null);
     try {
       const r = await fetch(`/api/admin/teams/${id}/approve`, { method: "POST" });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Failed");
       qc.invalidateQueries({ queryKey: ["admin-registration", id] });
       qc.invalidateQueries({ queryKey: ["admin-registrations"] });

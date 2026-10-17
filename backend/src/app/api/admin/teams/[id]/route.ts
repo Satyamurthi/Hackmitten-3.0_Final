@@ -531,6 +531,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
 
       if (baseUrl) {
+        const leader = allMembers.find((m) => m.isLeader);
         for (const member of allMembers) {
           if (!member.email || !member.qrToken) continue;
           const passUrl = `${baseUrl}/pass/${member.qrToken}`;
@@ -544,6 +545,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               participantId: member.participantId ?? "",
               passUrl,
               whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+              isLeader: Boolean(member.isLeader),
+              leaderName: leader?.fullName || member.fullName,
             }),
             text: approvalEmailText({
               participantName: member.fullName,
@@ -552,6 +555,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               participantId: member.participantId ?? "",
               passUrl,
               whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+              isLeader: Boolean(member.isLeader),
+              leaderName: leader?.fullName || member.fullName,
             }),
           }).catch((err) => {
             console.error("[admin/teams] Failed to send approval email on edit:", member.email, err);

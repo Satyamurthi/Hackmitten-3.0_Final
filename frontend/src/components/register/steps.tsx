@@ -19,10 +19,10 @@ export function RegisterStepper() {
           <div className="flex flex-col items-center gap-2">
             <div
               className={`flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border text-xs font-semibold transition-all ${i < step
-                  ? "border-[#B52A32] bg-[#B52A32] text-white"
-                  : i === step
-                    ? "border-[#B52A32] bg-transparent text-[#B52A32] red-glow"
-                    : "border-white/15 text-[#A8A8A8]"
+                ? "border-[#B52A32] bg-[#B52A32] text-white"
+                : i === step
+                  ? "border-[#B52A32] bg-transparent text-[#B52A32] red-glow"
+                  : "border-white/15 text-[#A8A8A8]"
                 }`}
             >
               {i < step ? <Check size={14} /> : String(i + 1).padStart(2, "0")}
@@ -537,11 +537,10 @@ export function StepDetails() {
                     setDomain(dom.id, dom.name);
                     setAttemptedContinue(false);
                   }}
-                  className={`p-4 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                    isSelected
+                  className={`p-4 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${isSelected
                       ? "border-[#B52A32] bg-[#B52A32]/15 text-white shadow-md shadow-[#B52A32]/10"
                       : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/25 hover:text-white hover:bg-white/5"
-                  }`}
+                    }`}
                 >
                   <div className="min-w-0">
                     <div className="font-semibold text-sm text-white truncate">{dom.name}</div>
@@ -593,8 +592,8 @@ export function StepDetails() {
           {members.map((m, i) => (
             <div key={i} className="flex items-start gap-3 md:gap-4 pb-3 md:pb-4 border-b border-white/5 last:border-0 last:pb-0">
               <div className={`flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full mono text-xs ${i === 0
-                  ? "bg-[#B52A32] text-white"
-                  : "bg-[#151515] border border-white/10 text-[#B52A32]"
+                ? "bg-[#B52A32] text-white"
+                : "bg-[#151515] border border-white/10 text-[#B52A32]"
                 }`}>
                 {i === 0 ? <Crown size={14} /> : String(i + 1).padStart(2, "0")}
               </div>
@@ -776,7 +775,7 @@ export function StepPayment() {
     <div className="max-w-2xl mx-auto">
       <h2 className="display text-3xl md:text-5xl font-bold text-white mb-3">TRANSMIT PAYMENT.</h2>
       <p className="text-sm md:text-base text-[#A8A8A8] mb-8 md:mb-10">
-        Pay the registration fee via UPI, then enter the transaction ID and upload the screenshot.
+        Pay the registration fee via UPI, then enter the UTR ID and upload the screenshot.
       </p>
 
       <div className="glass rounded-lg p-5 md:p-8 mb-6 md:mb-8">
@@ -848,13 +847,13 @@ export function StepPayment() {
 
       <label className="block mb-6">
         <span className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
-          Transaction ID
+          UTR ID
         </span>
         <input
           type="text"
           value={transactionId}
           onChange={(e) => setTransactionId(e.target.value)}
-          placeholder="Enter your UPI transaction ID"
+          placeholder="Enter your UPI UTR ID"
           className="mt-2 w-full bg-transparent border-b border-white/15 py-3 text-base md:text-lg text-white placeholder:text-[#A8A8A8]/40 focus:border-[#B52A32] focus:outline-none transition-colors"
         />
         {transactionError && <div className="mt-1 text-xs text-[#D83A43]">{transactionError}</div>}

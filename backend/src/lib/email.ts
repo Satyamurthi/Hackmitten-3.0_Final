@@ -194,6 +194,8 @@ export function approvalEmailHtml(opts: {
   participantId: string;
   passUrl: string;
   whatsappGroupUrl: string;
+  isLeader?: boolean;
+  leaderName?: string;
 }): string {
   const participantName = escapeHtml(opts.participantName);
   const teamName = escapeHtml(opts.teamName);
@@ -201,6 +203,9 @@ export function approvalEmailHtml(opts: {
   const participantId = escapeHtml(opts.participantId);
   const passUrl = escapeHtml(opts.passUrl);
   const whatsappGroupUrl = escapeHtml(opts.whatsappGroupUrl);
+  const leaderName = opts.leaderName ? escapeHtml(opts.leaderName) : null;
+  const isLeader = opts.isLeader !== undefined ? Boolean(opts.isLeader) : (!opts.leaderName || opts.leaderName === opts.participantName);
+
   return `
 <!DOCTYPE html>
 <html>
@@ -225,7 +230,12 @@ export function approvalEmailHtml(opts: {
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#151515;border-radius:8px;">
                 <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;">TEAM</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;">${teamName}</td></tr>
                 <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">REGISTRATION ID</td><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:16px;color:#B52A32;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${registrationId}</td></tr>
-                <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">TEAM LEADER</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${participantName}</td></tr>
+                <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">${isLeader ? "TEAM LEADER" : "PARTICIPANT"}</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${participantName}</td></tr>
+                ${
+                  !isLeader && leaderName
+                    ? `<tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">TEAM LEADER</td><td style="padding:16px 20px;font-size:16px;color:#F2F2F2;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${leaderName}</td></tr>`
+                    : ""
+                }
                 <tr><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A8A8A8;border-top:1px solid rgba(255,255,255,0.05);">PARTICIPANT ID</td><td style="padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:16px;color:#B52A32;font-weight:600;text-align:right;border-top:1px solid rgba(255,255,255,0.05);">${participantId}</td></tr>
               </table>
             </td>
@@ -266,7 +276,13 @@ export function approvalEmailText(opts: {
   participantId: string;
   passUrl: string;
   whatsappGroupUrl: string;
+  isLeader?: boolean;
+  leaderName?: string;
 }): string {
+  const isLeader = opts.isLeader !== undefined ? Boolean(opts.isLeader) : (!opts.leaderName || opts.leaderName === opts.participantName);
+  const roleLabel = isLeader ? "Team leader" : "Participant";
+  const leaderLine = !isLeader && opts.leaderName ? `\nTeam leader: ${opts.leaderName}` : "";
+
   return `HACKMITTEN 3.0 — TEAM APPROVED.
 
 Your team has been successfully approved.
@@ -274,7 +290,7 @@ You are officially accepted for the Hackmitten 3.0 hackathon.
 
 Team: ${opts.teamName}
 Registration ID: ${opts.registrationId}
-Team leader: ${opts.participantName}
+${roleLabel}: ${opts.participantName}${leaderLine}
 Participant ID: ${opts.participantId}
 
 Join the official Hackmitten 3.0 WhatsApp group: ${opts.whatsappGroupUrl}
@@ -287,6 +303,7 @@ Present the QR code on your pass at the food check-in counter.
 
 © 2026 Hackmitten`.trim();
 }
+
 export function paymentVerifiedEmailHtml(opts: { leaderName: string; teamName: string; contactEmail?: string | null; }): string {
   const leaderName = escapeHtml(opts.leaderName);
   const teamName = escapeHtml(opts.teamName);

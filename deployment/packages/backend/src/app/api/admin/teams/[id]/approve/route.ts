@@ -140,6 +140,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             participantId: leader.participantId ?? "",
             passUrl,
             whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            isLeader: true,
+            leaderName: leader.fullName,
           }),
           text: approvalEmailText({
             participantName: leader.fullName,
@@ -148,6 +150,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             participantId: leader.participantId ?? "",
             passUrl,
             whatsappGroupUrl: "https://chat.whatsapp.com/CKjNXeNALPzAymQ0GhfMCj",
+            isLeader: true,
+            leaderName: leader.fullName,
           }),
         });
         if (emailResult.success) {
