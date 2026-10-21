@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { jsonError, requirePermission } from "@/lib/api-auth";
-import { readPrivateFile, readPublicUpload } from "@/lib/upload";
+import { detectImageMime, readPrivateFile, readPublicUpload } from "@/lib/upload";
 import { participantImageContentDisposition, participantImageFilename } from "@/lib/participant-image-filename";
+import { findParticipantPhotoBuffer } from "@/lib/id-card-generator";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -10,26 +11,28 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const participant = await db.participant.findUnique({
       where: { id },
-      select: { fullName: true, participantImagePath: true, participantImageMimeType: true },
+      select: { fullName: true, participantImagePath: true, participantImageMimeType: true, participantId: true },
     });
-    if (!participant?.participantImagePath) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
 
-    const imagePath = participant.participantImagePath;
+    // 1. Try resilient participant photo resolution (private storage, photos dir, public uploads)
+    const photoBuffer = await findParticipantPhotoBuffer({
+      id,
+      fullName: participant.fullName,
+      participantId: participant.participantId,
+      participantImagePath: participant.participantImagePath,
+    });
 
-    if (imagePath.startsWith("private://")) {
-      const image = await readPrivateFile(imagePath);
-      if (!image) {
-        return NextResponse.json({ error: "Image file not found" }, { status: 404 });
-      }
+    if (photoBuffer && photoBuffer.length > 0) {
+      const detectedMime = detectImageMime(new Uint8Array(photoBuffer.subarray(0, 12)));
+      const contentType = detectedMime || participant.participantImageMimeType || "image/jpeg";
+      const filename = participantImageFilename(participant.fullName, contentType) || "participant.jpg";
 
-      const effectiveMime = participant.participantImageMimeType || image.contentType || "image/jpeg";
-      const filename = participantImageFilename(participant.fullName, effectiveMime) || "participant.jpg";
-
-      return new Response(new Uint8Array(image.data), {
+      return new Response(new Uint8Array(photoBuffer), {
         headers: {
-          "Content-Type": image.contentType || effectiveMime,
+          "Content-Type": contentType,
           "Content-Disposition": participantImageContentDisposition(filename),
           "Cache-Control": "private, max-age=60",
           "X-Content-Type-Options": "nosniff",
@@ -37,28 +40,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    if (imagePath.startsWith("/api/uploads/")) {
-      const match = imagePath.match(/^\/api\/uploads\/([a-z0-9_-]{1,40}_[a-f0-9]{12}\.(?:jpg|png|webp|gif))$/);
-      if (match) {
-        const contents = await readPublicUpload(match[1]);
-        if (contents) {
-          const ext = match[1].slice(match[1].lastIndexOf(".") + 1).toLowerCase();
-          const contentType =
-            ext === "png" ? "image/png" :
-            ext === "webp" ? "image/webp" :
-            ext === "gif" ? "image/gif" :
-            "image/jpeg";
-          const filename = participantImageFilename(participant.fullName, contentType) || "participant.jpg";
+    // 2. Direct fallback for private uploads if path is set
+    if (participant.participantImagePath?.startsWith("private://")) {
+      const image = await readPrivateFile(participant.participantImagePath);
+      if (image) {
+        const effectiveMime = participant.participantImageMimeType || image.contentType || "image/jpeg";
+        const filename = participantImageFilename(participant.fullName, effectiveMime) || "participant.jpg";
 
-          return new Response(new Uint8Array(contents), {
-            headers: {
-              "Content-Type": contentType,
-              "Content-Disposition": participantImageContentDisposition(filename),
-              "Cache-Control": "private, max-age=60",
-              "X-Content-Type-Options": "nosniff",
-            },
-          });
-        }
+        return new Response(new Uint8Array(image.data), {
+          headers: {
+            "Content-Type": image.contentType || effectiveMime,
+            "Content-Disposition": participantImageContentDisposition(filename),
+            "Cache-Control": "private, max-age=60",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
       }
     }
 
@@ -67,3 +63,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return jsonError(error);
   }
 }
+

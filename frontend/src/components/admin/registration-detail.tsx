@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ArrowLeft, Check, X, ShieldCheck, Loader2, ExternalLink, Crown, RotateCcw, Download, Pencil } from "lucide-react";
+import { ArrowLeft, Check, X, ShieldCheck, Loader2, ExternalLink, Crown, RotateCcw, Download, Pencil, CreditCard, User } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { QRCodeCanvas } from "qrcode.react";
 import QRCode from "qrcode";
+import { TeamIdCardsModal } from "./team-id-cards-modal";
 
 async function downloadParticipantQR(fullName: string, qrToken: string, participantId?: string | null) {
   try {
@@ -92,6 +93,7 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [showIdCards, setShowIdCards] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading, error: queryError } = useQuery<{ team: Team }>({
@@ -235,12 +237,20 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
             <div className={`text-sm font-semibold ${STATUS_COLORS[team.status]}`}>
               {team.status.replace(/_/g, " ")}
             </div>
-            <Link
-              href="/admin/teams"
-              className="inline-flex items-center gap-1.5 text-xs text-white/90 hover:text-white border border-white/15 hover:border-[#B52A32] rounded-full px-3 py-1 transition-all"
-            >
-              <Pencil size={11} /> Edit Team / Members
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowIdCards(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-white bg-[#B52A32] hover:bg-[#D83A43] rounded-full px-3.5 py-1 font-semibold transition-all shadow-md shadow-[#B52A32]/20 cursor-pointer"
+              >
+                <CreditCard size={12} /> ID Cards
+              </button>
+              <Link
+                href="/admin/teams"
+                className="inline-flex items-center gap-1.5 text-xs text-white/90 hover:text-white border border-white/15 hover:border-[#B52A32] rounded-full px-3 py-1 transition-all"
+              >
+                <Pencil size={11} /> Edit Team / Members
+              </Link>
+            </div>
           </div>
         </div>
         <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#B52A32]/30 bg-[#B52A32]/5 px-3 py-1.5">
@@ -257,14 +267,22 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
 
       {/* Members */}
       <section className="glass rounded-lg p-5">
-        <h2 className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8] mb-4">
-          Members ({team.members.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="mono text-[10px] uppercase tracking-widest text-[#A8A8A8]">
+            Members ({team.members.length})
+          </h2>
+          <button
+            onClick={() => setShowIdCards(true)}
+            className="inline-flex items-center gap-1 text-xs text-[#B52A32] hover:text-[#D83A43] font-semibold cursor-pointer"
+          >
+            <CreditCard size={12} /> Generate / View Team ID Cards →
+          </button>
+        </div>
         <div className="space-y-3">
           {team.members.map((m, i) => (
             <div key={m.id} className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] ${m.isLeader ? "bg-[#B52A32]/5 border-[#B52A32]/30" : ""}`}>
               <div className="flex items-start gap-3 flex-1 min-w-0">
-                {m.hasParticipantImage && <img src={`/api/admin/participants/${m.id}/image`} alt={`${m.fullName} participant photo`} className="h-16 w-16 rounded object-cover shrink-0" />}
+                <ParticipantPhotoThumbnail participantId={m.id} fullName={m.fullName} hasImage={m.hasParticipantImage} />
                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full mono text-xs ${
                   m.isLeader ? "bg-[#B52A32] text-white" : "bg-[#151515] text-[#B52A32]"
                 }`}>
@@ -548,6 +566,13 @@ export function AdminRegistrationDetail({ id }: { id: string }) {
           </button>
         </section>
       )}
+      {showIdCards && (
+        <TeamIdCardsModal
+          teamId={team.id}
+          teamName={team.teamName}
+          onClose={() => setShowIdCards(false)}
+        />
+      )}
     </div>
   );
 }
@@ -631,3 +656,45 @@ function PaymentScreenshot({ paymentId, screenshotId, fileName }: { paymentId: s
     </a>
   );
 }
+
+function ParticipantPhotoThumbnail({
+  participantId,
+  fullName,
+  hasImage,
+}: {
+  participantId: string;
+  fullName: string;
+  hasImage: boolean;
+}) {
+  const [imgState, setImgState] = useState<"loading" | "loaded" | "error">(hasImage ? "loading" : "error");
+
+  if (!hasImage || imgState === "error") {
+    return (
+      <div
+        className="h-16 w-16 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-[#121212] flex flex-col items-center justify-center text-[#A8A8A8]"
+        title={hasImage ? "Image could not be loaded" : "No custom photo uploaded"}
+      >
+        <User size={22} className="opacity-40" />
+        <span className="text-[9px] mt-0.5 opacity-60">No photo</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-16 w-16 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-[#121212] flex items-center justify-center">
+      {imgState === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
+          <Loader2 size={16} className="animate-spin text-white/30" />
+        </div>
+      )}
+      <img
+        src={`/api/admin/participants/${participantId}/image`}
+        alt={`${fullName} participant photo`}
+        className={`h-full w-full object-cover transition-opacity duration-200 ${imgState === "loaded" ? "opacity-100" : "opacity-0"}`}
+        onLoad={() => setImgState("loaded")}
+        onError={() => setImgState("error")}
+      />
+    </div>
+  );
+}
+

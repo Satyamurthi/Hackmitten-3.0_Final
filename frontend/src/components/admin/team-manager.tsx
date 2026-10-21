@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck, ExternalLink, CheckCircle2, RotateCcw, Download, Key } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Loader2, Crown, AlertTriangle, Search, ImagePlus, Check, AlertCircle, Upload, ShieldCheck, ExternalLink, CheckCircle2, RotateCcw, Download, Key, CreditCard } from "lucide-react";
 import { fetchJson } from "@/lib/api-fetch";
 import { compressImage } from "@/lib/image-compress";
+import { TeamIdCardsModal } from "./team-id-cards-modal";
 
 type Team = {
   id: string;
@@ -48,6 +49,7 @@ export function TeamManager() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Team | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Team | null>(null);
+  const [idCardsTeam, setIdCardsTeam] = useState<Team | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -280,6 +282,13 @@ export function TeamManager() {
 
               <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
                 <button
+                  onClick={() => setIdCardsTeam(team)}
+                  className="flex items-center gap-1 text-xs text-[#A8A8A8] hover:text-[#B52A32] px-2 py-1 rounded hover:bg-white/5 transition-colors font-medium"
+                  title="Generate and view ID cards"
+                >
+                  <CreditCard size={12} className="text-[#B52A32]" /> ID Cards
+                </button>
+                <button
                   onClick={() => setEditing(team)}
                   className="flex items-center gap-1 text-xs text-[#A8A8A8] hover:text-white px-2 py-1 rounded hover:bg-white/5"
                 >
@@ -345,6 +354,14 @@ export function TeamManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {idCardsTeam && (
+        <TeamIdCardsModal
+          teamId={idCardsTeam.id}
+          teamName={idCardsTeam.teamName}
+          onClose={() => setIdCardsTeam(null)}
+        />
       )}
     </div>
   );

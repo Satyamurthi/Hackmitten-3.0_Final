@@ -101,7 +101,7 @@ const CREW_STUDENTS: CrewMember[] = [
   {
     id: "student-rakshitha",
     name: "Rakshitha K M",
-    role: "Joint Secretary",
+    role: "Secretary",
     teams: ["Organising Team"],
     department: "CSE",
     section: "Section B",

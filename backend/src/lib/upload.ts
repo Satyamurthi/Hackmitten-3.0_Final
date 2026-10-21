@@ -234,21 +234,36 @@ export async function readPrivateFile(relativePath: string): Promise<{
 } | null> {
   const fileName = privateFileName(relativePath);
   if (!fileName) return null;
-  const abs = path.join(/*turbopackIgnore: true*/ PRIVATE_UPLOAD_ROOT, fileName);
 
-  try {
-    const data = await fs.readFile(/*turbopackIgnore: true*/ abs);
-    const ext = path.extname(fileName).toLowerCase();
+  const candidateDirs = [
+    PRIVATE_UPLOAD_ROOT,
+    path.resolve(process.cwd(), "storage", "private"),
+    path.resolve(process.cwd(), "backend", "storage", "private"),
+    path.resolve("E:/hackmitten/Hackmitten-3.0_Final/backend/storage/private"),
+    path.resolve("E:/hackmitten/Hackmitten-3.0_Final/storage/private"),
+    path.resolve("E:/var/lib/hackmitten/private"),
+    path.resolve(process.cwd(), "storage", "photos"),
+    path.resolve("E:/hackmitten/Hackmitten-3.0_Final/backend/storage/photos"),
+  ];
 
-    const contentType =
-      ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
-      ext === ".png" ? "image/png" :
-      ext === ".webp" ? "image/webp" :
-      ext === ".gif" ? "image/gif" :
-      "application/octet-stream";
+  for (const dir of candidateDirs) {
+    try {
+      const abs = path.join(dir, fileName);
+      const data = await fs.readFile(abs);
+      const ext = path.extname(fileName).toLowerCase();
 
-    return { data, contentType };
-  } catch {
-    return null;
+      const contentType =
+        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
+        ext === ".png" ? "image/png" :
+        ext === ".webp" ? "image/webp" :
+        ext === ".gif" ? "image/gif" :
+        "application/octet-stream";
+
+      return { data, contentType };
+    } catch {
+      // try next directory
+    }
   }
+
+  return null;
 }
