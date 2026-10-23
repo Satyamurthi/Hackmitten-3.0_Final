@@ -86,12 +86,19 @@ function RegisterContent() {
   const regOpen = eventState.data?.registrationOpen;
   const loading = eventState.isLoading;
   const registrationsOpen = eventState.data?.registrationsOpen ?? true;
-  const registrationCapacity = eventState.data?.registrationCapacity ?? 50;
-  const currentCount = eventState.data?.currentCount ?? 0;
-  const isFull =
-    !!eventState.data &&
-    registrationCapacity > 0 &&
-    currentCount >= registrationCapacity;
+  const totalCapacity = eventState.data?.totalCapacity ?? eventState.data?.registrationCapacity ?? 50;
+  const ugPgFull = eventState.data?.ugPgFull ?? false;
+  const diplomaFull = eventState.data?.diplomaFull ?? false;
+  const isFull = eventState.data?.isFull ?? false;
+
+  const currentDegree = degree || searchParams.get("degree");
+  const isCurrentCategoryFull =
+    currentDegree === "Diploma"
+      ? diplomaFull
+      : currentDegree === "UG" || currentDegree === "PG"
+      ? ugPgFull
+      : isFull;
+
   // Manual close (toggle off) is controlled by the admin.
   const manuallyClosed = !!eventState.data && !registrationsOpen && regOpen !== false;
 
@@ -138,8 +145,8 @@ function RegisterContent() {
     );
   }
 
-  // If registration is full (capacity reached)
-  if (isFull && !continuingRegistration) {
+  // If registration is full for this specific category (or entirely full)
+  if (isCurrentCategoryFull && !continuingRegistration) {
     return (
       <main className="relative min-h-screen bg-[#030303] text-white flex items-center justify-center px-5">
         <div
@@ -151,15 +158,19 @@ function RegisterContent() {
         />
         <div className="relative z-10 text-center max-w-md">
           <div className="mono text-xs uppercase tracking-[0.3em] text-[#B52A32] mb-4">
-            / Registrations Full
+            / {currentDegree ? `${currentDegree} Registration Full` : "Registrations Full"}
           </div>
           <h1 className="display text-4xl md:text-6xl font-bold text-white mb-4">
-            REGISTRATIONS
+            {currentDegree ? currentDegree.toUpperCase() : "REGISTRATION"}
             <br />
             <span className="text-[#B52A32]">FULL.</span>
           </h1>
           <p className="text-[#A8A8A8] mb-8">
-            All {registrationCapacity} spots have been taken. Thank you for the overwhelming response.
+            {currentDegree === "Diploma"
+              ? "All Diploma category spots have been taken. Thank you for the overwhelming response."
+              : currentDegree
+              ? `All ${currentDegree} category spots have been taken. Thank you for the overwhelming response.`
+              : `All ${totalCapacity} spots have been taken. Thank you for the overwhelming response.`}
           </p>
           <Link
             href="/"

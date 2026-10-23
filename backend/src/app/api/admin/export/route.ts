@@ -25,48 +25,258 @@ export async function GET(req: NextRequest) {
     const paymentStatus = searchParams.get("paymentStatus") || "";
     const college = searchParams.get("college")?.trim() || "";
     const mealId = searchParams.get("mealId")?.trim() || "";
+    const degree = searchParams.get("degree")?.trim() || "";
+    const domainId = searchParams.get("domainId")?.trim() || searchParams.get("domain")?.trim() || "";
     const from = searchParams.get("from")?.trim() || "";
     const to = searchParams.get("to")?.trim() || "";
 
     let csvText = "";
     let filename = "hackmitten-export";
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // 1. DEDICATED PAYMENT DETAILS EXPORT (WITH TEAM ID)
-    // ─────────────────────────────────────────────────────────────────────────────
-    if (type === "payments" || type === "payment") {
-      const where: Prisma.TeamWhereInput = {};
+    const buildTeamWhere = (): Prisma.TeamWhereInput => {
+      const conditions: Prisma.TeamWhereInput[] = [];
 
       if (paymentStatus && paymentStatus !== "ALL") {
-        where.payment = { status: paymentStatus as PaymentStatus };
+        conditions.push({ payment: { status: paymentStatus as PaymentStatus } });
       }
       if (status && status !== "ALL") {
-        where.status = status as RegistrationStatus;
+        conditions.push({ status: status as RegistrationStatus });
       }
+
+      if (degree && degree !== "ALL") {
+        const degUpper = degree.toUpperCase().trim();
+        if (degUpper === "DIPLOMA") {
+          conditions.push({
+            OR: [
+              { degree: "Diploma" },
+              { degree: "DIPLOMA" },
+              { degree: "diploma" },
+            ],
+          });
+        } else if (degUpper === "UG") {
+          conditions.push({
+            OR: [
+              { degree: "UG" },
+              { degree: "ug" },
+              { degree: "Undergraduate" },
+            ],
+          });
+        } else if (degUpper === "PG") {
+          conditions.push({
+            OR: [
+              { degree: "PG" },
+              { degree: "pg" },
+              { degree: "Postgraduate" },
+            ],
+          });
+        } else if (degUpper === "UG_PG" || degUpper === "UG/PG") {
+          conditions.push({
+            OR: [
+              { degree: { not: "Diploma" } },
+              { degree: null },
+            ],
+          });
+        } else {
+          conditions.push({ degree });
+        }
+      }
+
+      if (domainId && domainId !== "ALL") {
+        conditions.push({
+          OR: [
+            { domainId },
+            { domainName: { equals: domainId, mode: "insensitive" } },
+          ],
+        });
+      }
+
       if (college && college !== "ALL") {
-        where.college = { contains: college, mode: "insensitive" };
+        conditions.push({ college: { contains: college, mode: "insensitive" } });
       }
+
       if (from || to) {
-        where.createdAt = {};
-        if (from) where.createdAt.gte = new Date(from);
+        const dateCond: { gte?: Date; lte?: Date } = {};
+        if (from) dateCond.gte = new Date(from);
         if (to) {
           const toDate = new Date(to);
           toDate.setHours(23, 59, 59, 999);
-          where.createdAt.lte = toDate;
+          dateCond.lte = toDate;
         }
+        conditions.push({ createdAt: dateCond });
       }
+
       if (q) {
-        where.OR = [
-          { id: { contains: q, mode: "insensitive" } },
-          { teamName: { contains: q, mode: "insensitive" } },
-          { registrationId: { contains: q, mode: "insensitive" } },
-          { college: { contains: q, mode: "insensitive" } },
-          { payment: { transactionId: { contains: q, mode: "insensitive" } } },
-          { members: { some: { fullName: { contains: q, mode: "insensitive" } } } },
-          { members: { some: { email: { contains: q, mode: "insensitive" } } } },
-          { members: { some: { phone: { contains: q, mode: "insensitive" } } } },
-        ];
+        conditions.push({
+          OR: [
+            { id: { contains: q, mode: "insensitive" } },
+            { teamName: { contains: q, mode: "insensitive" } },
+            { registrationId: { contains: q, mode: "insensitive" } },
+            { college: { contains: q, mode: "insensitive" } },
+            { domainName: { contains: q, mode: "insensitive" } },
+            { payment: { transactionId: { contains: q, mode: "insensitive" } } },
+            { members: { some: { fullName: { contains: q, mode: "insensitive" } } } },
+            { members: { some: { email: { contains: q, mode: "insensitive" } } } },
+            { members: { some: { phone: { contains: q, mode: "insensitive" } } } },
+          ],
+        });
       }
+
+      return conditions.length > 0 ? { AND: conditions } : {};
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // 1. COLLEGE DESK REGISTRATION SHEET (PRINTABLE FOR STUDENT ARRIVAL CHECK-IN)
+    // ─────────────────────────────────────────────────────────────────────────────
+    if (type === "desk" || type === "checkin" || type === "college-checkin") {
+      const where = buildTeamWhere();
+      const teams = await db.team.findMany({
+        where,
+        orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],
+        include: {
+          payment: { select: { status: true, transactionId: true } },
+          members: {
+            orderBy: [{ isLeader: "desc" }, { createdAt: "asc" }],
+          },
+          domain: { select: { name: true } },
+        },
+      });
+
+      const rows: string[][] = [
+        [
+          "Sl No",
+          "Team ID",
+          "Registration ID",
+          "Team Name",
+          "Degree Category",
+          "Competition Domain",
+          "College",
+          "Team Leader Name",
+          "Leader Phone",
+          "Leader Email",
+          "Member 2 Name",
+          "Member 2 Phone",
+          "Member 3 Name",
+          "Member 3 Phone",
+          "Member 4 Name",
+          "Member 4 Phone",
+          "All Participants Summary",
+          "Total Members",
+          "Payment Status",
+          "Team Status",
+          "Physical Verification / Signature",
+        ],
+      ];
+
+      teams.forEach((t, index) => {
+        const leader = t.members.find((m) => m.isLeader) || t.members[0];
+        const nonLeaders = t.members.filter((m) => !m.isLeader);
+        const m2 = nonLeaders[0];
+        const m3 = nonLeaders[1];
+        const m4 = nonLeaders[2];
+
+        const allMembersFormatted = t.members
+          .map((m) => `${m.fullName} (${m.isLeader ? "Leader" : "Member"}, ${m.phone})`)
+          .join(" | ");
+
+        rows.push([
+          String(index + 1),
+          t.id,
+          t.registrationId ?? "",
+          t.teamName,
+          t.degree ?? "UG/PG",
+          t.domainName ?? t.domain?.name ?? "General",
+          t.college ?? leader?.college ?? "",
+          leader?.fullName ?? "",
+          leader?.phone ?? "",
+          leader?.email ?? "",
+          m2?.fullName ?? "",
+          m2?.phone ?? "",
+          m3?.fullName ?? "",
+          m3?.phone ?? "",
+          m4?.fullName ?? "",
+          m4?.phone ?? "",
+          allMembersFormatted,
+          String(t.members.length),
+          t.payment?.status ?? "NO_PAYMENT",
+          t.status,
+          "", // Blank column for physical attendance signature at registration desk
+        ]);
+      });
+
+      csvText = csvDocument(rows);
+      const degreeSuffix = degree ? `-${degree.toLowerCase().replace(/[^a-z0-9]/g, "-")}` : "";
+      filename = `college-desk-registration-sheet${degreeSuffix}`;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // 2. DOMAIN-WISE TEAMS REPORT
+    // ─────────────────────────────────────────────────────────────────────────────
+    } else if (type === "domains" || type === "domain") {
+      const where = buildTeamWhere();
+      const teams = await db.team.findMany({
+        where,
+        orderBy: [{ domainName: "asc" }, { registrationId: "asc" }, { createdAt: "asc" }],
+        include: {
+          payment: { select: { status: true, transactionId: true } },
+          members: {
+            orderBy: [{ isLeader: "desc" }, { createdAt: "asc" }],
+          },
+          domain: { select: { name: true, degrees: true } },
+        },
+      });
+
+      const rows: string[][] = [
+        [
+          "Sl No",
+          "Domain Name",
+          "Domain Eligible Degrees",
+          "Team ID",
+          "Registration ID",
+          "Team Name",
+          "Degree Category",
+          "College",
+          "Team Leader Name",
+          "Leader Phone",
+          "Leader Email",
+          "Total Members",
+          "Member Names",
+          "Payment Status",
+          "Team Status",
+          "Registration Date",
+        ],
+      ];
+
+      teams.forEach((t, index) => {
+        const leader = t.members.find((m) => m.isLeader) || t.members[0];
+        const allMemberNames = t.members.map((m) => m.fullName).join(", ");
+        rows.push([
+          String(index + 1),
+          t.domainName ?? t.domain?.name ?? "Unassigned / General",
+          t.domain?.degrees?.join(", ") ?? "All",
+          t.id,
+          t.registrationId ?? "",
+          t.teamName,
+          t.degree ?? "UG/PG",
+          t.college ?? leader?.college ?? "",
+          leader?.fullName ?? "",
+          leader?.phone ?? "",
+          leader?.email ?? "",
+          String(t.members.length),
+          allMemberNames,
+          t.payment?.status ?? "NO_PAYMENT",
+          t.status,
+          t.createdAt.toISOString(),
+        ]);
+      });
+
+      csvText = csvDocument(rows);
+      const degreeSuffix = degree ? `-${degree.toLowerCase().replace(/[^a-z0-9]/g, "-")}` : "";
+      filename = `domain-teams-report${degreeSuffix}`;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // 3. DEDICATED PAYMENT DETAILS EXPORT (WITH DEGREE & DOMAIN)
+    // ─────────────────────────────────────────────────────────────────────────────
+    } else if (type === "payments" || type === "payment") {
+      const where = buildTeamWhere();
 
       const teams = await db.team.findMany({
         where,
@@ -81,6 +291,7 @@ export async function GET(req: NextRequest) {
           members: {
             orderBy: [{ isLeader: "desc" }, { createdAt: "asc" }],
           },
+          domain: { select: { name: true } },
         },
       });
 
@@ -89,6 +300,8 @@ export async function GET(req: NextRequest) {
           "Team ID",
           "Registration ID",
           "Team Name",
+          "Degree Category",
+          "Competition Domain",
           "College",
           "Leader Name",
           "Leader Email",
@@ -111,6 +324,8 @@ export async function GET(req: NextRequest) {
           t.id,
           t.registrationId ?? "",
           t.teamName,
+          t.degree ?? "UG/PG",
+          t.domainName ?? t.domain?.name ?? "General",
           t.college ?? leader?.college ?? "",
           leader?.fullName ?? "",
           leader?.email ?? "",
@@ -131,7 +346,7 @@ export async function GET(req: NextRequest) {
       filename = `payments${paymentStatus && paymentStatus !== "ALL" ? `-${paymentStatus.toLowerCase()}` : ""}`;
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 2. FOOD CHECK-INS EXPORT (WITH MEAL & SEARCH FILTERS)
+    // 4. FOOD CHECK-INS EXPORT (WITH MEAL & SEARCH FILTERS)
     // ─────────────────────────────────────────────────────────────────────────────
     } else if (type === "food") {
       const foodWhere: Prisma.FoodCheckInWhereInput = {};

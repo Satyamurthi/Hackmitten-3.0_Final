@@ -111,9 +111,11 @@ function ProblemStatementCountdown({
   const [hasExpired, setHasExpired] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    setNow(Date.now());
-    if (!targetIso) return;
+    const timer = setTimeout(() => {
+      setMounted(true);
+      setNow(Date.now());
+    }, 0);
+    if (!targetIso) return () => clearTimeout(timer);
 
     const interval = window.setInterval(() => {
       const current = Date.now();
@@ -125,7 +127,10 @@ function ProblemStatementCountdown({
       }
     }, 1000);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      window.clearInterval(interval);
+    };
   }, [targetIso, hasExpired, onExpire]);
 
   if (!targetIso) {

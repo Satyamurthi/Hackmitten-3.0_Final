@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, CheckCircle2, Clock, ShieldCheck, UtensilsCrossed, Download, X, Filter, CreditCard, RotateCcw } from "lucide-react";
+import { Users, CheckCircle2, Clock, ShieldCheck, UtensilsCrossed, Download, X, Filter, CreditCard, RotateCcw, GraduationCap, Award, ClipboardCheck, Layers } from "lucide-react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/api-fetch";
 
 type Stats = {
   counts: {
     totalTeams: number;
+    diplomaTeams?: number;
+    ugPgTeams?: number;
     approvedTeams: number;
     pendingPayments: number;
     verifiedPayments: number;
@@ -27,6 +29,7 @@ type Stats = {
     id: string;
     teamName: string;
     status: string;
+    degree?: string | null;
     college: string | null;
     members: { id: string }[];
     payment: { status: string } | null;
@@ -35,6 +38,8 @@ type Stats = {
 
 const STAT_CARDS = [
   { key: "totalTeams", label: "Total Registrations", icon: Users },
+  { key: "ugPgTeams", label: "UG & PG Teams", icon: GraduationCap },
+  { key: "diplomaTeams", label: "Diploma Teams", icon: Award },
   { key: "approvedTeams", label: "Approved Teams", icon: CheckCircle2 },
   { key: "pendingPayments", label: "Pending Payments", icon: Clock },
   { key: "verifiedPayments", label: "Verified Payments", icon: ShieldCheck },
@@ -60,10 +65,18 @@ export function AdminDashboardHome() {
     refetchInterval: 15000,
   });
 
+  const { data: domainsData } = useQuery<{ domains: { id: string; name: string }[] }>({
+    queryKey: ["admin-export-domains-list"],
+    queryFn: () => fetchJson("/api/admin/domains"),
+  });
+  const domainsList = domainsData?.domains ?? [];
+
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [exportType, setExportType] = useState<"payments" | "food" | "teams" | "participants">("payments");
+  const [exportType, setExportType] = useState<"desk" | "domains" | "payments" | "food" | "teams" | "participants">("desk");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState("");
   const [filterTeamStatus, setFilterTeamStatus] = useState("");
+  const [filterDegree, setFilterDegree] = useState("");
+  const [filterDomainId, setFilterDomainId] = useState("");
   const [filterMealId, setFilterMealId] = useState("");
   const [filterCollege, setFilterCollege] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
@@ -73,6 +86,8 @@ export function AdminDashboardHome() {
   const resetFilters = () => {
     setFilterPaymentStatus("");
     setFilterTeamStatus("");
+    setFilterDegree("");
+    setFilterDomainId("");
     setFilterMealId("");
     setFilterCollege("");
     setFilterSearch("");
@@ -86,14 +101,16 @@ export function AdminDashboardHome() {
     if (filterSearch.trim()) params.set("q", filterSearch.trim());
     if (filterFromDate) params.set("from", filterFromDate);
     if (filterToDate) params.set("to", filterToDate);
+    if (filterDegree) params.set("degree", filterDegree);
+    if (filterDomainId) params.set("domainId", filterDomainId);
 
-    if (exportType === "payments") {
+    if (exportType === "payments" || exportType === "desk") {
       if (filterPaymentStatus) params.set("paymentStatus", filterPaymentStatus);
       if (filterTeamStatus) params.set("status", filterTeamStatus);
       if (filterCollege.trim()) params.set("college", filterCollege.trim());
     } else if (exportType === "food") {
       if (filterMealId) params.set("mealId", filterMealId);
-    } else if (exportType === "teams" || exportType === "participants") {
+    } else if (exportType === "teams" || exportType === "participants" || exportType === "domains") {
       if (filterTeamStatus) params.set("status", filterTeamStatus);
       if (filterCollege.trim()) params.set("college", filterCollege.trim());
     }
@@ -148,81 +165,135 @@ export function AdminDashboardHome() {
             {/* Dataset Type Selector */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-white/90">Dataset Type</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => setExportType("payments")}
-                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
-                    exportType === "payments"
-                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                  onClick={() => setExportType("desk")}
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
+                    exportType === "desk"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
                       : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
                   }`}
                 >
-                  <CreditCard size={14} className={exportType === "payments" ? "text-[#D83A43]" : ""} />
-                  <span>Payments</span>
+                  <ClipboardCheck size={16} className={exportType === "desk" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">Desk Sheet (Arrival)</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">All details + Signature check-in</span>
+                  </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setExportType("food")}
-                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
-                    exportType === "food"
-                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                  onClick={() => setExportType("domains")}
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
+                    exportType === "domains"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
                       : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
                   }`}
                 >
-                  <UtensilsCrossed size={14} className={exportType === "food" ? "text-[#D83A43]" : ""} />
-                  <span>Food</span>
+                  <Layers size={16} className={exportType === "domains" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">Domain-Wise Teams</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">Grouped teams by chosen domain</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportType("payments")}
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
+                    exportType === "payments"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <CreditCard size={16} className={exportType === "payments" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">Payments</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">Txn IDs, Verification log</span>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setExportType("teams")}
-                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
                     exportType === "teams"
-                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
                       : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
                   }`}
                 >
-                  <Users size={14} className={exportType === "teams" ? "text-[#D83A43]" : ""} />
-                  <span>Teams</span>
+                  <Users size={16} className={exportType === "teams" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">Teams Summary</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">Team & leader roster</span>
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setExportType("participants")}
-                  className={`px-3 py-2 text-xs rounded-lg border text-left flex items-center gap-2 transition-all ${
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
                     exportType === "participants"
-                      ? "border-[#B52A32] bg-[#B52A32]/10 text-white font-medium"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
                       : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
                   }`}
                 >
-                  <Users size={14} className={exportType === "participants" ? "text-[#D83A43]" : ""} />
-                  <span>Members</span>
+                  <GraduationCap size={16} className={exportType === "participants" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">All Members</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">Individual participant rows</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportType("food")}
+                  className={`p-2.5 text-xs rounded-lg border text-left flex items-start gap-2.5 transition-all ${
+                    exportType === "food"
+                      ? "border-[#B52A32] bg-[#B52A32]/15 text-white font-medium ring-1 ring-[#B52A32]"
+                      : "border-white/10 bg-[#080808] text-[#A8A8A8] hover:border-white/20"
+                  }`}
+                >
+                  <UtensilsCrossed size={16} className={exportType === "food" ? "text-[#D83A43] shrink-0 mt-0.5" : "text-[#A8A8A8] shrink-0 mt-0.5"} />
+                  <div>
+                    <span className="block font-medium text-white">Food Scans</span>
+                    <span className="text-[10px] text-[#A8A8A8] block">Meal check-ins log</span>
+                  </div>
                 </button>
               </div>
             </div>
 
             {/* Field Info Banner */}
             <div className="bg-[#121212] border border-white/10 rounded-lg p-3 text-[11px] text-[#A8A8A8] leading-relaxed">
+              {exportType === "desk" && (
+                <span>
+                  <strong className="text-white">College Desk Registration Sheet (On-Campus Student Arrival):</strong> Team ID, Registration ID, Team Name, Degree Category (UG/PG/Diploma), Competition Domain, College, Team Leader (Name, Phone, Email), Member 2 (Name, Phone), Member 3 (Name, Phone), Member 4 (Name, Phone), All Participants Summary, Payment Status, Team Status, and a blank <strong className="text-emerald-400">Physical Verification / Student Signature</strong> column for manual check-in on paper.
+                </span>
+              )}
+              {exportType === "domains" && (
+                <span>
+                  <strong className="text-white">Domain-Wise Teams Breakdown:</strong> Domain ID, Domain Name, Eligible Degrees, Team ID, Registration ID, Team Name, Degree Category, Competition Domain, College, Leader Name/Phone/Email, Member Count, Payment Status, Team Status, Registration Date.
+                </span>
+              )}
               {exportType === "payments" && (
                 <span>
-                  <strong className="text-white">Fields exported:</strong> Team ID, Registration ID, Team Name, College, Leader Name/Email/Phone, Member Count, Payment ID, Transaction ID, Payment Status, Team Status, Screenshots Count, Verified By, Verified At, Registration Date.
+                  <strong className="text-white">Payments Export:</strong> Team ID, Registration ID, Team Name, Degree Category, Competition Domain, College, Leader Info, Member Count, Payment ID, Transaction ID, Payment Status, Team Status, Screenshots Count, Verified By, Verified At, Registration Date.
                 </span>
               )}
               {exportType === "food" && (
                 <span>
-                  <strong className="text-white">Fields exported:</strong> Check-in ID, Meal ID, Meal Name, Meal Type, Meal Date, Participant ID, Participant Name, Participant Email, Participant Phone, Team ID, Team Name, College, Role, Scanned By, Checked In At.
+                  <strong className="text-white">Food Check-in Log:</strong> Check-in ID, Meal ID, Meal Name, Meal Type, Meal Date, Participant ID, Participant Name, Participant Email, Participant Phone, Team ID, Team Name, College, Role, Scanned By, Checked In At.
                 </span>
               )}
               {exportType === "teams" && (
                 <span>
-                  <strong className="text-white">Fields exported:</strong> Team ID, Registration ID, Team Name, College, Team Status, Payment Status, Transaction ID, Member Count, Leader Info, Members List, Created At.
+                  <strong className="text-white">Teams Summary:</strong> Team ID, Registration ID, Team Name, Degree Category, Competition Domain, College, Team Status, Payment Status, Transaction ID, Member Count, Leader Info, Members List, Created At.
                 </span>
               )}
               {exportType === "participants" && (
                 <span>
-                  <strong className="text-white">Fields exported:</strong> Participant ID, Full Name, Email, Phone, Role, College, Year, Branch, GitHub, LinkedIn, Team ID, Team Name, Registration ID, Created At.
+                  <strong className="text-white">Participant Directory:</strong> Participant ID, Full Name, Email, Phone, Role, College, Year, Branch, GitHub, LinkedIn, Team ID, Team Name, Registration ID, Created At.
                 </span>
               )}
             </div>
@@ -244,53 +315,92 @@ export function AdminDashboardHome() {
 
               {/* Dynamic Filter Rows */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {exportType === "payments" && (
+                {exportType !== "food" && (
                   <>
+                    {/* Degree Category Filter */}
                     <div>
-                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Payment Status</label>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Degree Category</label>
                       <select
-                        value={filterPaymentStatus}
-                        onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                        value={filterDegree}
+                        onChange={(e) => setFilterDegree(e.target.value)}
                         className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
                       >
-                        <option value="">All Payment Statuses</option>
-                        <option value="PENDING">PENDING</option>
-                        <option value="VERIFIED">VERIFIED</option>
-                        <option value="REJECTED">REJECTED</option>
+                        <option value="">All Degrees (UG, PG & Diploma)</option>
+                        <option value="UG_PG">UG & PG Teams Only (Combined)</option>
+                        <option value="Diploma">Diploma Teams Only</option>
+                        <option value="UG">Undergraduate (UG Only)</option>
+                        <option value="PG">Postgraduate (PG Only)</option>
                       </select>
                     </div>
 
+                    {/* Domain Filter */}
                     <div>
-                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Team Status</label>
+                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Competition Domain</label>
                       <select
-                        value={filterTeamStatus}
-                        onChange={(e) => setFilterTeamStatus(e.target.value)}
+                        value={filterDomainId}
+                        onChange={(e) => setFilterDomainId(e.target.value)}
                         className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
                       >
-                        <option value="">All Team Statuses</option>
-                        <option value="SUBMITTED">SUBMITTED</option>
-                        <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
-                        <option value="PAYMENT_VERIFIED">PAYMENT_VERIFIED</option>
-                        <option value="APPROVED">APPROVED</option>
-                        <option value="REJECTED">REJECTED</option>
+                        <option value="">All Domains</option>
+                        {domainsList.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
                       </select>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-[11px] text-[#A8A8A8] mb-1">College Filter</label>
-                      <input
-                        type="text"
-                        value={filterCollege}
-                        onChange={(e) => setFilterCollege(e.target.value)}
-                        placeholder="e.g. MIT, Cambridge, Stanford..."
-                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
-                      />
                     </div>
                   </>
                 )}
 
-                {exportType === "food" && (
+                {(exportType === "payments" || exportType === "desk") && (
                   <div>
+                    <label className="block text-[11px] text-[#A8A8A8] mb-1">Payment Status</label>
+                    <select
+                      value={filterPaymentStatus}
+                      onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                      className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                    >
+                      <option value="">All Payment Statuses</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="VERIFIED">VERIFIED</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </select>
+                  </div>
+                )}
+
+                {exportType !== "food" && (
+                  <div>
+                    <label className="block text-[11px] text-[#A8A8A8] mb-1">Team Status</label>
+                    <select
+                      value={filterTeamStatus}
+                      onChange={(e) => setFilterTeamStatus(e.target.value)}
+                      className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
+                    >
+                      <option value="">All Team Statuses</option>
+                      <option value="SUBMITTED">SUBMITTED</option>
+                      <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
+                      <option value="PAYMENT_VERIFIED">PAYMENT_VERIFIED</option>
+                      <option value="APPROVED">APPROVED</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </select>
+                  </div>
+                )}
+
+                {exportType !== "food" && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] text-[#A8A8A8] mb-1">College Filter</label>
+                    <input
+                      type="text"
+                      value={filterCollege}
+                      onChange={(e) => setFilterCollege(e.target.value)}
+                      placeholder="e.g. MIT, Cambridge, Stanford..."
+                      className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {exportType === "food" && (
+                  <div className="sm:col-span-2">
                     <label className="block text-[11px] text-[#A8A8A8] mb-1">Specific Meal</label>
                     <select
                       value={filterMealId}
@@ -307,45 +417,18 @@ export function AdminDashboardHome() {
                   </div>
                 )}
 
-                {(exportType === "teams" || exportType === "participants") && (
-                  <>
-                    <div>
-                      <label className="block text-[11px] text-[#A8A8A8] mb-1">Team Status</label>
-                      <select
-                        value={filterTeamStatus}
-                        onChange={(e) => setFilterTeamStatus(e.target.value)}
-                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-[#B52A32] focus:outline-none"
-                      >
-                        <option value="">All Team Statuses</option>
-                        <option value="SUBMITTED">SUBMITTED</option>
-                        <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
-                        <option value="PAYMENT_VERIFIED">PAYMENT_VERIFIED</option>
-                        <option value="APPROVED">APPROVED</option>
-                        <option value="REJECTED">REJECTED</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] text-[#A8A8A8] mb-1">College Filter</label>
-                      <input
-                        type="text"
-                        value={filterCollege}
-                        onChange={(e) => setFilterCollege(e.target.value)}
-                        placeholder="College name..."
-                        className="w-full bg-[#080808] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder:text-[#666] focus:border-[#B52A32] focus:outline-none"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className={exportType === "food" ? "sm:col-span-1" : "sm:col-span-2"}>
+                <div className="sm:col-span-2">
                   <label className="block text-[11px] text-[#A8A8A8] mb-1">Search Keywords</label>
                   <input
                     type="text"
                     value={filterSearch}
                     onChange={(e) => setFilterSearch(e.target.value)}
                     placeholder={
-                      exportType === "payments"
+                      exportType === "desk"
+                        ? "Search by team name, leader name, email, phone, college..."
+                        : exportType === "domains"
+                        ? "Search by domain, team name, leader..."
+                        : exportType === "payments"
                         ? "Search by team name, email, phone, transaction ID..."
                         : exportType === "food"
                         ? "Search participant, team name, email..."
@@ -402,17 +485,32 @@ export function AdminDashboardHome() {
       {queryError && <div role="alert" className="glass rounded p-3 text-sm text-[#D83A43] border-l-2 border-[#B52A32]">{queryError.message}</div>}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
         {STAT_CARDS.map((card) => {
           const Icon = card.icon;
+          const count = isLoading || queryError ? "—" : data?.counts[card.key] ?? 0;
           return (
-            <div key={card.key} className="glass rounded-lg p-4">
-              <Icon size={16} className="text-[#A8A8A8] mb-3" />
-              <div className="display text-2xl md:text-3xl font-bold text-white">
-                {isLoading || queryError ? "—" : data?.counts[card.key] ?? 0}
+            <div key={card.key} className="glass rounded-lg p-3.5 flex flex-col justify-between min-h-[96px]">
+              <div className="flex items-center justify-between mb-2">
+                <Icon size={16} className="text-[#A8A8A8]" />
+                {card.key === "ugPgTeams" && (
+                  <span className="mono text-[8px] uppercase px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-semibold">
+                    UG / PG
+                  </span>
+                )}
+                {card.key === "diplomaTeams" && (
+                  <span className="mono text-[8px] uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold">
+                    Diploma
+                  </span>
+                )}
               </div>
-              <div className="mono text-[9px] uppercase tracking-widest text-[#A8A8A8] mt-1">
-                {card.label}
+              <div>
+                <div className="display text-2xl md:text-3xl font-bold text-white leading-none">
+                  {count}
+                </div>
+                <div className="mono text-[9px] uppercase tracking-widest text-[#A8A8A8] mt-1.5 truncate" title={card.label}>
+                  {card.label}
+                </div>
               </div>
             </div>
           );
@@ -441,8 +539,19 @@ export function AdminDashboardHome() {
                   className="flex items-center gap-4 p-4 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">{t.teamName}</div>
-                    <div className="text-xs text-[#A8A8A8] truncate">
+                    <div className="text-sm font-semibold text-white truncate flex items-center gap-2">
+                      <span>{t.teamName}</span>
+                      {t.degree && (
+                        <span className={`mono text-[9px] uppercase px-1.5 py-0.2 rounded font-semibold border ${
+                          t.degree === "Diploma"
+                            ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                            : "bg-cyan-500/10 text-cyan-300 border-cyan-500/20"
+                        }`}>
+                          {t.degree}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-[#A8A8A8] truncate mt-0.5">
                       {t.members.length} members · {t.college ?? "No college"}
                     </div>
                   </div>

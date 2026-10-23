@@ -28,7 +28,11 @@ export async function GET() {
       },
       orderBy: [{ enabled: "desc" }, { name: "asc" }],
     });
-    return NextResponse.json({ domains });
+    const formatted = domains.map((d) => ({
+      ...d,
+      teamCount: d._count?.teams ?? 0,
+    }));
+    return NextResponse.json({ domains: formatted });
   } catch (err) {
     return jsonError(err);
   }

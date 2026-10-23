@@ -8,6 +8,7 @@ export function CTA() {
   const openRegistrationModal = useRegistrationModal((s) => s.open);
   const eventState = useEventState();
   const regOpen = eventState.data?.registrationOpen ?? true;
+  const isFull = eventState.data?.isFull ?? false;
 
   return (
     <section className="relative py-24 md:py-48">
@@ -21,7 +22,7 @@ export function CTA() {
           <span className="text-[#A8A8A8]">MISSION.</span>
         </h2>
 
-        {regOpen ? (
+        {regOpen && !isFull ? (
           <>
             <p className="mx-auto mt-8 max-w-md text-base md:text-lg text-[#A8A8A8]">
               Assemble your team.
@@ -36,6 +37,17 @@ export function CTA() {
               REGISTER NOW
               <span className="text-lg transition-transform duration-200 group-hover:translate-x-1">→</span>
             </button>
+          </>
+        ) : isFull ? (
+          <>
+            <p className="mx-auto mt-8 max-w-md text-base md:text-lg text-[#A8A8A8]">
+              All registration spots have been filled.
+              <br />
+              See you at the event horizon.
+            </p>
+            <div className="mt-12 inline-flex items-center justify-center rounded-full border border-[#B52A32]/40 bg-[#B52A32]/10 px-8 md:px-10 py-4 text-sm md:text-base font-semibold tracking-wide text-[#D83A43] min-h-[44px]">
+              REGISTRATIONS FULL
+            </div>
           </>
         ) : (
           <p className="mx-auto mt-8 max-w-md text-base md:text-lg text-[#A8A8A8]">

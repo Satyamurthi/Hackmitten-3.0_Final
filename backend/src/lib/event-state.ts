@@ -45,12 +45,22 @@ export interface EventStateInfo {
   registrationMessage: string;
   /** Manual registration open/close toggle (EventConfig.registrationsOpen) */
   registrationsOpen: boolean;
-  /** Maximum number of teams allowed (EventConfig.registrationCapacity) */
+  /** Maximum number of teams allowed (combined or UG/PG) */
   registrationCapacity: number;
-  /** Current number of registered teams */
+  /** Current number of registered teams across all categories */
   currentCount: number;
   /** True when registration is open AND not full */
   registrationAvailable: boolean;
+
+  /** Category-specific counts and capacities */
+  ugPgCount: number;
+  ugPgCapacity: number;
+  ugPgFull: boolean;
+  diplomaCount: number;
+  diplomaCapacity: number;
+  diplomaFull: boolean;
+  isFull: boolean;
+  totalCapacity: number;
 }
 
 /**
@@ -72,7 +82,10 @@ export function computeEventState(cfg: {
   registrationCapacity?: number | null;
   registrationEnabled?: boolean | null;
   registrationLimit?: number | null;
+  diplomaRegistrationLimit?: number | null;
   currentCount?: number | null;
+  ugPgCount?: number | null;
+  diplomaCount?: number | null;
 }, now: Date = new Date()): EventStateInfo {
   const timezone = cfg.eventTimezone || "Asia/Kolkata";
   const durationHours = cfg.eventDurationHours || 24;
@@ -108,11 +121,34 @@ export function computeEventState(cfg: {
   }
 
   const registrationsOpen = cfg.registrationEnabled ?? cfg.registrationsOpen ?? true;
-  const registrationCapacity = cfg.registrationLimit !== undefined ? (cfg.registrationLimit ?? 0) : (cfg.registrationCapacity ?? 0);
-  const currentCount = cfg.currentCount ?? 0;
-  const isFull = registrationCapacity > 0 && currentCount >= registrationCapacity;
+  
+  const ugPgCapacity = cfg.registrationLimit !== undefined && cfg.registrationLimit !== null
+    ? cfg.registrationLimit
+    : (cfg.registrationCapacity ?? 0);
+  const diplomaCapacity = cfg.diplomaRegistrationLimit ?? 0;
+
+  const ugPgCount = cfg.ugPgCount ?? 0;
+  const diplomaCount = cfg.diplomaCount ?? 0;
+  const currentCount = cfg.currentCount ?? (ugPgCount + diplomaCount);
+
+  const ugPgFull = ugPgCapacity > 0 && ugPgCount >= ugPgCapacity;
+  const diplomaFull = diplomaCapacity > 0 && diplomaCount >= diplomaCapacity;
+
+  // The event is completely full only if all active/configured categories have reached their limit
+  let isFull = false;
+  if (ugPgCapacity > 0 && diplomaCapacity > 0) {
+    isFull = ugPgFull && diplomaFull;
+  } else if (ugPgCapacity > 0) {
+    isFull = ugPgFull;
+  } else if (diplomaCapacity > 0) {
+    isFull = diplomaFull;
+  }
+
+  const totalCapacity = (ugPgCapacity > 0 ? ugPgCapacity : 0) + (diplomaCapacity > 0 ? diplomaCapacity : 0);
+  const registrationCapacity = totalCapacity > 0 ? totalCapacity : ugPgCapacity;
+
   // Registration is "available" when state is REGISTRATION_OPEN AND the manual
-  // toggle is on AND there's still capacity.
+  // toggle is on AND at least one category has available capacity.
   const registrationAvailable =
     state === "REGISTRATION_OPEN" && registrationsOpen && !isFull;
 
@@ -129,6 +165,14 @@ export function computeEventState(cfg: {
     registrationCapacity,
     currentCount,
     registrationAvailable,
+    ugPgCount,
+    ugPgCapacity,
+    ugPgFull,
+    diplomaCount,
+    diplomaCapacity,
+    diplomaFull,
+    isFull,
+    totalCapacity,
   };
 }
 
@@ -141,7 +185,13 @@ export async function getEventState(
 ): Promise<EventStateInfo> {
   const cfg = await database.eventConfig.findUnique({ 
     where: { id: "singleton" }, 
-    select: { registrationEnabled: true, registrationLimit: true, eventStartDate: true, eventStartTime: true } 
+    select: { 
+      registrationEnabled: true, 
+      registrationLimit: true, 
+      diplomaRegistrationLimit: true,
+      eventStartDate: true, 
+      eventStartTime: true 
+    } 
   });
   if (!cfg) {
     return {
@@ -157,10 +207,29 @@ export async function getEventState(
       registrationCapacity: 0,
       currentCount: 0,
       registrationAvailable: false,
+      ugPgCount: 0,
+      ugPgCapacity: 0,
+      ugPgFull: false,
+      diplomaCount: 0,
+      diplomaCapacity: 0,
+      diplomaFull: false,
+      isFull: false,
+      totalCapacity: 0,
     };
   }
 
-  const currentCount = await database.team.count();
+  const [diplomaCount, ugPgCount] = await Promise.all([
+    database.team.count({ where: { degree: "Diploma" } }),
+    database.team.count({
+      where: {
+        OR: [
+          { degree: { not: "Diploma" } },
+          { degree: null },
+        ],
+      },
+    }),
+  ]);
+  const currentCount = diplomaCount + ugPgCount;
 
   return computeEventState({
     ...EVENT_STATIC,
@@ -168,6 +237,8 @@ export async function getEventState(
     eventStartDate: cfg.eventStartDate || EVENT_STATIC.eventStartDate,
     eventStartTime: cfg.eventStartTime || EVENT_STATIC.eventStartTime,
     currentCount,
+    ugPgCount,
+    diplomaCount,
   });
 }
 

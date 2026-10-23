@@ -56,10 +56,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // ─── Capacity check (atomic with team creation via transaction) ─────
-    if (eventState.registrationCapacity > 0 && eventState.currentCount >= eventState.registrationCapacity) {
+    // Global full check (only if all categories are completely full)
+    if (eventState.isFull) {
       return NextResponse.json(
-        { error: "Registration is full. All spots have been taken.", code: "REG_FULL" },
+        { error: "Registrations are currently full. All spots have been taken.", code: "REGISTRATIONS_FULL" },
         { status: 403 },
       );
     }
@@ -122,14 +122,31 @@ export async function POST(req: Request) {
 
     const degree = parsed.data.degree ?? null;
 
-    // Check category-specific limits (Diploma capacity limit)
+    // Check category-specific limits before uploading member photos
+    const eventCfg = await db.eventConfig.findUnique({ where: { id: "singleton" } });
     if (degree === "Diploma") {
-      const eventCfg = await db.eventConfig.findUnique({ where: { id: "singleton" } });
       if (eventCfg?.diplomaRegistrationLimit && eventCfg.diplomaRegistrationLimit > 0) {
         const diplomaCount = await db.team.count({ where: { degree: "Diploma" } });
         if (diplomaCount >= eventCfg.diplomaRegistrationLimit) {
           return NextResponse.json(
             { error: "Diploma category registration is full. All spots have been filled.", code: "DIPLOMA_REG_FULL" },
+            { status: 403 },
+          );
+        }
+      }
+    } else {
+      if (eventCfg?.registrationLimit && eventCfg.registrationLimit > 0) {
+        const ugPgCount = await db.team.count({
+          where: {
+            OR: [
+              { degree: { not: "Diploma" } },
+              { degree: null },
+            ],
+          },
+        });
+        if (ugPgCount >= eventCfg.registrationLimit) {
+          return NextResponse.json(
+            { error: "UG/PG category registration is full. All spots have been filled.", code: "UG_PG_REG_FULL" },
             { status: 403 },
           );
         }
@@ -188,20 +205,35 @@ export async function POST(req: Request) {
         throw new Error("TEAM_NAME_TAKEN");
       }
 
-      const currentCount = await tx.team.count();
       const cfg = await tx.eventConfig.findUnique({ where: { id: "singleton" } });
       if (!cfg) throw new Error("EVENT_CONFIG_MISSING");
-      const currentEventState = computeEventState({ ...cfg, currentCount });
-      if (currentEventState.state !== "REGISTRATION_OPEN") {
-        throw new Error("Registration is closed.");
-      }
-      const capacity = cfg.registrationLimit;
-      const open = cfg.registrationEnabled;
-      if (!open) {
+      if (!cfg.registrationEnabled) {
         throw new Error("Registrations are currently closed.");
       }
-      if (capacity !== null && currentCount >= capacity) {
-        throw new Error("Registration is full. All spots have been taken.");
+
+      // Check category-specific capacity atomically inside the transaction
+      const degreeCategory = parsed.data.degree ?? null;
+      if (degreeCategory === "Diploma") {
+        if (cfg.diplomaRegistrationLimit && cfg.diplomaRegistrationLimit > 0) {
+          const diplomaCount = await tx.team.count({ where: { degree: "Diploma" } });
+          if (diplomaCount >= cfg.diplomaRegistrationLimit) {
+            throw new Error("Diploma category registration is full.");
+          }
+        }
+      } else {
+        if (cfg.registrationLimit && cfg.registrationLimit > 0) {
+          const ugPgCount = await tx.team.count({
+            where: {
+              OR: [
+                { degree: { not: "Diploma" } },
+                { degree: null },
+              ],
+            },
+          });
+          if (ugPgCount >= cfg.registrationLimit) {
+            throw new Error("UG/PG category registration is full.");
+          }
+        }
       }
 
       return tx.team.create({

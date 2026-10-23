@@ -16,6 +16,8 @@ import {
   AlertCircle,
   X,
   Power,
+  Users,
+  Download,
 } from "lucide-react";
 
 type Config = {
@@ -34,6 +36,7 @@ export interface DomainItem {
   degrees: string[];
   enabled: boolean;
   teamCount?: number;
+  _count?: { teams: number };
   createdAt: string;
 }
 
@@ -661,13 +664,78 @@ export function EventSettingsEditor() {
                   Define hackathon domains and map them to compatible degree categories (Diploma, UG, PG).
                 </p>
               </div>
-              <button
-                onClick={openAddDomainModal}
-                className="inline-flex items-center gap-2 rounded-full bg-[#B52A32] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#D83A43] transition-all shadow-md self-start sm:self-auto"
-              >
-                <Plus size={14} /> Add Domain
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center rounded-lg border border-white/10 bg-[#080808] p-1 text-xs">
+                  <span className="text-[11px] text-[#A8A8A8] px-2 flex items-center gap-1">
+                    <Download size={12} /> Export:
+                  </span>
+                  <a
+                    href="/api/admin/export?type=domains"
+                    download
+                    className="px-2.5 py-1 rounded text-[11px] text-white hover:bg-white/10 transition-colors"
+                    title="Download all domains with all registered teams"
+                  >
+                    All Degrees
+                  </a>
+                  <span className="text-white/20">|</span>
+                  <a
+                    href="/api/admin/export?type=domains&degree=UG_PG"
+                    download
+                    className="px-2.5 py-1 rounded text-[11px] text-cyan-300 hover:bg-cyan-500/10 transition-colors font-medium"
+                    title="Download only UG & PG teams across domains"
+                  >
+                    UG / PG Teams
+                  </a>
+                  <span className="text-white/20">|</span>
+                  <a
+                    href="/api/admin/export?type=domains&degree=Diploma"
+                    download
+                    className="px-2.5 py-1 rounded text-[11px] text-amber-300 hover:bg-amber-500/10 transition-colors font-medium"
+                    title="Download only Diploma teams across domains"
+                  >
+                    Diploma Teams
+                  </a>
+                </div>
+
+                <button
+                  onClick={openAddDomainModal}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#B52A32] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#D83A43] transition-all shadow-md"
+                >
+                  <Plus size={14} /> Add Domain
+                </button>
+              </div>
             </div>
+
+            {/* Domain Summary Bar */}
+            {!domainsLoading && domains.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-lg border border-white/10 bg-[#080808] p-3 flex items-center justify-between">
+                  <div>
+                    <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Total Domains</div>
+                    <div className="display text-xl font-bold text-white mt-0.5">{domains.length}</div>
+                  </div>
+                  <Globe size={18} className="text-[#A8A8A8]" />
+                </div>
+                <div className="rounded-lg border border-white/10 bg-[#080808] p-3 flex items-center justify-between">
+                  <div>
+                    <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Active Domains</div>
+                    <div className="display text-xl font-bold text-green-400 mt-0.5">
+                      {domains.filter((d) => d.enabled).length}
+                    </div>
+                  </div>
+                  <Check size={18} className="text-green-400" />
+                </div>
+                <div className="rounded-lg border border-white/10 bg-[#080808] p-3 flex items-center justify-between">
+                  <div>
+                    <div className="mono text-[10px] uppercase tracking-wider text-[#A8A8A8]">Total Teams Chosen</div>
+                    <div className="display text-xl font-bold text-[#D83A43] mt-0.5">
+                      {domains.reduce((acc, d) => acc + (d.teamCount ?? d._count?.teams ?? 0), 0)}
+                    </div>
+                  </div>
+                  <Users size={18} className="text-[#D83A43]" />
+                </div>
+              </div>
+            )}
 
             {domainsLoading ? (
               <div className="text-sm text-[#A8A8A8] py-8 text-center">Loading domains...</div>
@@ -681,43 +749,91 @@ export function EventSettingsEditor() {
               </div>
             ) : (
               <div className="divide-y divide-white/5 border border-white/10 rounded-lg overflow-hidden bg-[#080808]">
-                {domains.map((dom) => (
-                  <div
-                    key={dom.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-semibold text-white text-base">{dom.name}</span>
-                        <span
-                          className={`mono text-[10px] px-2 py-0.5 rounded-full ${
-                            dom.enabled
-                              ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                              : "bg-red-500/10 text-red-400 border border-red-500/20"
-                          }`}
-                        >
-                          {dom.enabled ? "Active" : "Disabled"}
-                        </span>
-                        {dom.teamCount !== undefined && dom.teamCount > 0 && (
-                          <span className="mono text-[10px] bg-white/5 text-[#A8A8A8] px-2 py-0.5 rounded border border-white/10">
-                            {dom.teamCount} team{dom.teamCount === 1 ? "" : "s"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#A8A8A8]">
-                        <span className="mono text-[10px] uppercase text-[#A8A8A8]/70">Degrees:</span>
-                        {dom.degrees.map((d) => (
+                {domains.map((dom) => {
+                  const teamsChosen = dom.teamCount ?? dom._count?.teams ?? 0;
+                  return (
+                    <div
+                      key={dom.id}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-semibold text-white text-base">{dom.name}</span>
                           <span
-                            key={d}
-                            className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white border border-white/10"
+                            className={`mono text-[10px] px-2 py-0.5 rounded-full ${
+                              dom.enabled
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            }`}
                           >
-                            {d}
+                            {dom.enabled ? "Active" : "Disabled"}
                           </span>
-                        ))}
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                          {/* Domain Count Badge */}
+                          <span
+                            className={`mono text-[11px] px-2.5 py-0.5 rounded font-semibold border flex items-center gap-1.5 ${
+                              teamsChosen > 0
+                                ? "bg-[#B52A32]/15 text-[#D83A43] border-[#B52A32]/40 shadow-[0_0_12px_rgba(216,58,67,0.2)]"
+                                : "bg-white/5 text-[#A8A8A8] border-white/10"
+                            }`}
+                          >
+                            <Users size={12} />
+                            {teamsChosen} {teamsChosen === 1 ? "Team Chosen" : "Teams Chosen"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#A8A8A8]">
+                          <span className="mono text-[10px] uppercase text-[#A8A8A8]/70">Degrees:</span>
+                          {dom.degrees.map((d) => (
+                            <span
+                              key={d}
+                              className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white border border-white/10"
+                            >
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {teamsChosen > 0 && (
+                        <div className="flex items-center rounded-lg border border-white/10 bg-[#050505] p-1 text-[11px]">
+                          <a
+                            href={`/api/admin/export?type=domains&domainId=${dom.id}`}
+                            download
+                            title={`Download all ${teamsChosen} teams registered for ${dom.name}`}
+                            className="px-2 py-0.5 text-white hover:bg-white/10 rounded flex items-center gap-1 transition-colors"
+                          >
+                            <Download size={11} /> All ({teamsChosen})
+                          </a>
+                          {(dom.degrees.includes("UG") || dom.degrees.includes("PG")) && (
+                            <>
+                              <span className="text-white/20">|</span>
+                              <a
+                                href={`/api/admin/export?type=domains&domainId=${dom.id}&degree=UG_PG`}
+                                download
+                                title={`Download UG & PG teams for ${dom.name}`}
+                                className="px-2 py-0.5 text-cyan-300 hover:bg-cyan-500/10 rounded font-medium transition-colors"
+                              >
+                                UG/PG
+                              </a>
+                            </>
+                          )}
+                          {dom.degrees.includes("Diploma") && (
+                            <>
+                              <span className="text-white/20">|</span>
+                              <a
+                                href={`/api/admin/export?type=domains&domainId=${dom.id}&degree=Diploma`}
+                                download
+                                title={`Download Diploma teams for ${dom.name}`}
+                                className="px-2 py-0.5 text-amber-300 hover:bg-amber-500/10 rounded font-medium transition-colors"
+                              >
+                                Diploma
+                              </a>
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       <button
                         onClick={() => toggleDomainStatus(dom)}
                         title={dom.enabled ? "Disable domain" : "Enable domain"}
@@ -745,7 +861,8 @@ export function EventSettingsEditor() {
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
           </div>

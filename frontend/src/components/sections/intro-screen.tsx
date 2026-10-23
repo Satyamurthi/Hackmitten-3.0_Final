@@ -11,7 +11,9 @@ export function IntroScreen({ onFinish }: { onFinish?: () => void } = {}) {
   const [isHolding, setIsHolding] = useState(false);
 
   const isHoldingRef = useRef(false);
+  useEffect(() => {
   isHoldingRef.current = isHolding;
+}, [isHolding]);
 
   const elapsedRef = useRef(0);
   const totalDuration = 4500; // 4.5s comfortable viewing window before smooth animated glide
@@ -135,8 +137,10 @@ export function IntroScreen({ onFinish }: { onFinish?: () => void } = {}) {
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (isReduced) {
-      setStage("gone");
-      return;
+      const timer = setTimeout(() => {
+        setStage("gone");
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     let lastTime = performance.now();

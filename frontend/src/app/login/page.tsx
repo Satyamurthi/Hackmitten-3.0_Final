@@ -20,7 +20,13 @@ const ROLE_OPTIONS: { id: Role; title: string; subtitle: string; icon: any; hint
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(() => {
+    const roleParam = searchParams.get("role");
+    if (roleParam && ["ADMIN", "COORDINATOR", "FOOD", "PARTICIPANT"].includes(roleParam.toUpperCase())) {
+      return roleParam.toUpperCase() as Role;
+    }
+    return null;
+  });
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,7 +35,10 @@ function LoginForm() {
   useEffect(() => {
     const roleParam = searchParams.get("role");
     if (roleParam && ["ADMIN", "COORDINATOR", "FOOD", "PARTICIPANT"].includes(roleParam.toUpperCase())) {
-      setSelectedRole(roleParam.toUpperCase() as Role);
+      const timer = setTimeout(() => {
+        setSelectedRole(roleParam.toUpperCase() as Role);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [searchParams]);
 

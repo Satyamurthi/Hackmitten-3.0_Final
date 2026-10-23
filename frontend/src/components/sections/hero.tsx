@@ -34,8 +34,10 @@ export function Hero({
     !!eventState.data &&
     eventState.data.registrationOpen &&
     (!eventState.data.registrationsOpen ||
-      (eventState.data.registrationCapacity > 0 &&
-        eventState.data.currentCount >= eventState.data.registrationCapacity));
+      (eventState.data.isFull !== undefined
+        ? eventState.data.isFull
+        : eventState.data.registrationCapacity > 0 &&
+          eventState.data.currentCount >= eventState.data.registrationCapacity));
 
   const [stage, setStage] = useState<HeroStage>("blank");
   const [collegeSettled, setCollegeSettled] = useState(false);
@@ -47,9 +49,11 @@ export function Hero({
   const isFastRef = useRef(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const onShowNavRef = useRef(onShowNav);
-  onShowNavRef.current = onShowNav;
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useEffect(() => {
+    onShowNavRef.current = onShowNav;
+    onCompleteRef.current = onComplete;
+  }, [onShowNav, onComplete]);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((t) => clearTimeout(t));
@@ -287,7 +291,7 @@ export function Hero({
   heroSponsors.sort((a, b) => getPriority(a.name) - getPriority(b.name));
 
   // When complete, lock all elements visible permanently (prevents any invisible flash or reset)
-  const isComplete = stage === "complete" || hasCompletedRef.current;
+  const isComplete = stage === "complete";
   const showCollege = isComplete || stage !== "blank";
   const showLogos = isComplete || (stage !== "blank" && stage !== "college-center" && stage !== "college-move");
   const showTitle = isComplete || stage === "inaugurate" || stage === "details";

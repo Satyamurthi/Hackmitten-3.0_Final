@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchJson } from "@/lib/api-fetch";
 import { resolveSponsors } from "@/data/sponsors";
 
 export interface SponsorItem {
@@ -177,8 +176,10 @@ function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
 
   // Track responsive container width
   useEffect(() => {
-    setMounted(true);
-    if (!containerRef.current) return;
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    if (!containerRef.current) return () => clearTimeout(timer);
 
     const el = containerRef.current;
     const updateSize = () => {
@@ -192,6 +193,7 @@ function SponsorGlobe({ sponsors }: { sponsors: SponsorItem[] }) {
     window.addEventListener("resize", updateSize);
 
     return () => {
+      clearTimeout(timer);
       ro.disconnect();
       window.removeEventListener("resize", updateSize);
     };

@@ -22,6 +22,15 @@ export interface EventStateInfo {
   registrationCapacity: number;
   currentCount: number;
   registrationAvailable: boolean;
+
+  ugPgCount?: number;
+  ugPgCapacity?: number;
+  ugPgFull?: boolean;
+  diplomaCount?: number;
+  diplomaCapacity?: number;
+  diplomaFull?: boolean;
+  isFull?: boolean;
+  totalCapacity?: number;
 }
 
 const DEFAULT_EVENT_INFO: EventStateInfo = {
@@ -37,6 +46,14 @@ const DEFAULT_EVENT_INFO: EventStateInfo = {
   registrationCapacity: 50,
   currentCount: 1,
   registrationAvailable: true,
+  ugPgCount: 1,
+  ugPgCapacity: 50,
+  ugPgFull: false,
+  diplomaCount: 0,
+  diplomaCapacity: 0,
+  diplomaFull: false,
+  isFull: false,
+  totalCapacity: 50,
 };
 
 /**

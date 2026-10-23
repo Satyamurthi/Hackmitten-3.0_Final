@@ -161,8 +161,8 @@ export async function generateParticipantCard(
   const backTemplatePath = await resolveTemplatePath("back.png");
 
   const frontMeta = await sharp(frontTemplatePath).metadata();
-  const W = frontMeta.width || 624;
-  const H = frontMeta.height || 1072;
+  const W = frontMeta.width || 591;
+  const H = frontMeta.height || 1004;
 
   const missingFields: string[] = [];
   if (!participant.fullName?.trim()) missingFields.push("Full Name");
@@ -175,11 +175,11 @@ export async function generateParticipantCard(
     missingFields.push("Participant Photo");
   }
 
-  const photoW = 286;
-  const photoH = 286;
-  const photoTop = 320;
+  const photoW = 268;
+  const photoH = 266;
+  const photoTop = 300;
   const photoLeft = Math.round((W - photoW) / 2);
-  const roundedCornersSvg = `<svg><rect x="0" y="0" width="${photoW}" height="${photoH}" rx="18" ry="18" /></svg>`;
+  const roundedCornersSvg = `<svg><rect x="0" y="0" width="${photoW}" height="${photoH}" rx="16" ry="16" /></svg>`;
 
   let photoBuffer: Buffer;
   if (rawPhotoBuffer) {
@@ -200,24 +200,22 @@ export async function generateParticipantCard(
   const teamName = (team.teamName || "TEAM").toUpperCase();
   const idNumber = participant.participantId || team.registrationId || `HM3-${participant.id.slice(0, 6)}`;
 
-  let nameFontSize = 26;
-  if (name.length > 25) nameFontSize = 20;
-  else if (name.length > 18) nameFontSize = 23;
+  let nameFontSize = 22;
+  if (name.length > 25) nameFontSize = 17;
+  else if (name.length > 18) nameFontSize = 19;
 
-  let collegeFontSize = 14;
-  if (college.length > 38) collegeFontSize = 11;
+  let collegeFontSize = 12;
+  if (college.length > 38) collegeFontSize = 10.5;
 
-  let teamFontSize = 17;
-  if (teamName.length > 18) teamFontSize = 14;
+  let teamFontSize = 16;
+  if (teamName.length > 18) teamFontSize = 13;
 
   const frontOverlaySvg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-    <!-- Blank out "YOUR NAME" area -->
-    <rect x="35" y="626" width="${W - 70}" height="58" fill="#FFFFFF" />
-    <!-- Blank out College area -->
-    <rect x="35" y="684" width="${W - 70}" height="52" fill="#FFFFFF" />
+    <!-- Seamless background for Name and College -->
+    <rect x="30" y="600" width="${W - 60}" height="92" fill="#FFFFFF" />
 
     <!-- Participant Name -->
-    <text x="${W / 2}" y="668" 
+    <text x="${W / 2}" y="634" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
           font-size="${nameFontSize}" 
           font-weight="800" 
@@ -226,7 +224,7 @@ export async function generateParticipantCard(
           letter-spacing="0.5">${escapeXml(name)}</text>
 
     <!-- College Name -->
-    <text x="${W / 2}" y="710" 
+    <text x="${W / 2}" y="668" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
           font-size="${collegeFontSize}" 
           font-weight="600" 
@@ -234,19 +232,19 @@ export async function generateParticipantCard(
           text-anchor="middle">${escapeXml(college)}</text>
 
     <!-- Blank out Team Name box compartment -->
-    <rect x="42" y="828" width="356" height="74" rx="8" fill="#FFFFFF" />
+    <rect x="25" y="764" width="352" height="80" rx="8" fill="#FFFFFF" />
     <!-- Blank out Team ID box compartment -->
-    <rect x="408" y="828" width="174" height="74" rx="8" fill="#FFFFFF" />
+    <rect x="386" y="764" width="168" height="80" rx="8" fill="#FFFFFF" />
 
     <!-- Team Name Label and Value -->
-    <text x="220" y="856" 
+    <text x="201" y="792" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
-          font-size="11" 
+          font-size="10" 
           font-weight="700" 
           fill="#98A2B3" 
           text-anchor="middle" 
           letter-spacing="1">TEAM NAME</text>
-    <text x="220" y="884" 
+    <text x="201" y="822" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
           font-size="${teamFontSize}" 
           font-weight="800" 
@@ -254,14 +252,14 @@ export async function generateParticipantCard(
           text-anchor="middle">${escapeXml(teamName)}</text>
 
     <!-- Team ID Label and Value -->
-    <text x="495" y="856" 
+    <text x="470" y="792" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
-          font-size="11" 
+          font-size="10" 
           font-weight="700" 
           fill="#98A2B3" 
           text-anchor="middle" 
-          letter-spacing="1">ID NUMBER</text>
-    <text x="495" y="884" 
+          letter-spacing="1">TEAM ID</text>
+    <text x="470" y="822" 
           font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
           font-size="14" 
           font-weight="800" 
@@ -366,7 +364,7 @@ export async function buildTeamIdCardsPdf(cards: GeneratedParticipantCard[]): Pr
 
   // Standard badge width: 252 pt (3.5 inches), height scaled to total template ratio with top margin
   const pageWidth = 252;
-  const pageHeight = Math.round(pageWidth * ((1072 + CARD_TOP_MARGIN) / 624));
+  const pageHeight = Math.round(pageWidth * ((1004 + CARD_TOP_MARGIN) / 591));
 
   for (const card of cards) {
     const frontImg = await pdfDoc.embedPng(card.frontBuffer);

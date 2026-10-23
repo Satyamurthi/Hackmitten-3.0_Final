@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/api-fetch";
 
@@ -72,7 +72,9 @@ export function AdminRegistrationsList() {
   const total = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
-  const exportUrl = `/api/admin/export?type=payments${q ? `&q=${encodeURIComponent(q)}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}${paymentStatus ? `&paymentStatus=${encodeURIComponent(paymentStatus)}` : ""}`;
+  const filterQueryString = `${q ? `&q=${encodeURIComponent(q)}` : ""}${status ? `&status=${encodeURIComponent(status)}` : ""}${paymentStatus ? `&paymentStatus=${encodeURIComponent(paymentStatus)}` : ""}`;
+  const exportUrl = `/api/admin/export?type=payments${filterQueryString}`;
+  const deskExportUrl = `/api/admin/export?type=desk${filterQueryString}`;
 
   return (
     <div className="space-y-6">
@@ -84,13 +86,23 @@ export function AdminRegistrationsList() {
           <h1 className="display text-3xl md:text-4xl font-bold text-white">All Teams</h1>
           <p className="text-sm text-[#A8A8A8] mt-1">{total} total · click any row to verify payment</p>
         </div>
-        <a
-          href={exportUrl}
-          download
-          className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap self-start sm:self-auto"
-        >
-          <Download size={14} /> Export Payments (CSV)
-        </a>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <a
+            href={deskExportUrl}
+            download
+            className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300 hover:border-emerald-500 hover:bg-emerald-500/20 transition-all whitespace-nowrap"
+            title="Download printable arrival check-in sheet with participant details and signature column"
+          >
+            <ClipboardCheck size={14} /> Desk Arrival Sheet (CSV)
+          </a>
+          <a
+            href={exportUrl}
+            download
+            className="flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs text-white hover:border-[#B52A32] hover:bg-white/5 transition-all whitespace-nowrap"
+          >
+            <Download size={14} /> Export Payments (CSV)
+          </a>
+        </div>
       </header>
 
       {/* Filters */}

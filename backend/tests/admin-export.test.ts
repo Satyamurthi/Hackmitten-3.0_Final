@@ -38,7 +38,8 @@ function makeTeam(memberCount: number, overrides: Partial<AdminExportTeam> = {})
     registrationAcknowledgementAttemptedAt: createdAt,
     registrationAcknowledgementSentAt: updatedAt,
     approvalEmailSentAt: null,
-    rejectionEmailSentAt: updatedAt,
+    degree: "B.Tech",
+    domainName: "Web Development",
     members: Array.from({ length: memberCount }, (_, index) => makeMember(index + 1)),
     payment: {
       id: "payment-1",
@@ -65,7 +66,7 @@ function cell(rows: string[][], rowIndex: number, header: string): string {
 describe("admin CSV export", () => {
   it("has the complete, documented team, member, and payment column order", () => {
     const teamHeaders = [
-      "teamId", "teamName", "registrationId", "status", "college", "memberCount",
+      "teamId", "teamName", "registrationId", "degree", "domain", "status", "college", "memberCount",
       "createdAt", "updatedAt", "registrationAccessExpiresAt",
       "registrationAcknowledgementAttemptCount", "registrationAcknowledgementAttemptedAt",
       "registrationAcknowledgementSentAt", "approvalEmailSentAt", "rejectionEmailSentAt",

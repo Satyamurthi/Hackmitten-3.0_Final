@@ -50,21 +50,32 @@ const CATEGORIES: {
   },
 ];
 
+import { useEventState } from "@/components/auth/use-event-state";
+
 export function RegistrationEntryModal() {
   const router = useRouter();
   const { isOpen, initialView, close } = useRegistrationModal();
   const [view, setView] = useState<"options" | "categories">("options");
   const setDegree = useRegisterStore((s) => s.setDegree);
+  const eventState = useEventState();
+
+  const ugPgFull = eventState.data?.ugPgFull ?? false;
+  const diplomaFull = eventState.data?.diplomaFull ?? false;
 
   useEffect(() => {
     if (isOpen) {
-      setView(initialView);
+      const timer = setTimeout(() => {
+        setView(initialView);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, initialView]);
 
   if (!isOpen) return null;
 
   const handleSelectCategory = (cat: DegreeCategory) => {
+    const isCatFull = cat === "Diploma" ? diplomaFull : ugPgFull;
+    if (isCatFull) return;
     setDegree(cat);
     close();
     router.push(`/register?degree=${cat}`);
@@ -186,42 +197,73 @@ export function RegistrationEntryModal() {
             </div>
 
             <div className="grid grid-cols-1 gap-3.5 pt-1">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => handleSelectCategory(cat.id)}
-                  className="group w-full rounded-xl border border-white/10 bg-[#121212] p-4.5 sm:p-5 text-left transition-all hover:border-[#B52A32]/60 hover:bg-[#151515] hover:shadow-[0_0_30px_rgba(181,42,50,0.15)] flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white group-hover:bg-[#B52A32] transition-all">
-                      <GraduationCap size={22} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="display text-base sm:text-lg font-bold text-white tracking-tight">
-                          {cat.name}
-                        </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${cat.badgeColor}`}>
-                          {cat.badge}
-                        </span>
+              {CATEGORIES.map((cat) => {
+                const isCatFull = cat.id === "Diploma" ? diplomaFull : ugPgFull;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    disabled={isCatFull}
+                    onClick={() => handleSelectCategory(cat.id)}
+                    className={`group w-full rounded-xl border p-4.5 sm:p-5 text-left transition-all flex items-center justify-between ${
+                      isCatFull
+                        ? "border-white/5 bg-[#0e0e0e] opacity-65 cursor-not-allowed"
+                        : "border-white/10 bg-[#121212] hover:border-[#B52A32]/60 hover:bg-[#151515] hover:shadow-[0_0_30px_rgba(181,42,50,0.15)] cursor-pointer"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-all ${
+                          isCatFull
+                            ? "bg-white/5 border-white/5 text-[#666]"
+                            : "bg-white/5 border-white/10 text-white group-hover:bg-[#B52A32]"
+                        }`}
+                      >
+                        <GraduationCap size={22} />
                       </div>
-                      <div className="text-xs text-[#A8A8A8] mt-1">
-                        {cat.eligible}
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`display text-base sm:text-lg font-bold tracking-tight ${
+                              isCatFull ? "text-[#888]" : "text-white"
+                            }`}
+                          >
+                            {cat.name}
+                          </span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${cat.badgeColor}`}>
+                            {cat.badge}
+                          </span>
+                          {isCatFull && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border border-[#B52A32]/60 bg-[#B52A32]/20 text-[#D83A43]">
+                              REGISTRATION FULL
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-[#A8A8A8] mt-1">
+                          {cat.eligible}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="text-right shrink-0 pl-3">
-                    <div className="mono text-sm sm:text-base font-bold text-[#B52A32]">
-                      {cat.fee}
+                    <div className="text-right shrink-0 pl-3">
+                      {isCatFull ? (
+                        <div className="mono text-xs font-bold text-[#D83A43] uppercase tracking-wide">
+                          FULL
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mono text-sm sm:text-base font-bold text-[#B52A32]">
+                            {cat.fee}
+                          </div>
+                          <div className="text-[10px] text-[#A8A8A8] uppercase tracking-wider">
+                            per team
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div className="text-[10px] text-[#A8A8A8] uppercase tracking-wider">
-                      per team
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
             <p className="text-[11px] text-[#666] text-center">

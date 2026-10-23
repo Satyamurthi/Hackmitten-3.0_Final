@@ -12,6 +12,8 @@ export async function GET() {
 
     const [
       totalTeams,
+      diplomaTeams,
+      ugPgTeams,
       approvedTeams,
       pendingPayments,
       verifiedPayments,
@@ -23,6 +25,15 @@ export async function GET() {
       recentRegistrations,
     ] = await Promise.all([
       db.team.count(),
+      db.team.count({ where: { degree: "Diploma" } }),
+      db.team.count({
+        where: {
+          OR: [
+            { degree: { not: "Diploma" } },
+            { degree: null },
+          ],
+        },
+      }),
       db.team.count({ where: { status: RegistrationStatus.APPROVED } }),
       db.payment.count({ where: { status: PaymentStatus.PENDING } }),
       db.payment.count({ where: { status: PaymentStatus.VERIFIED } }),
@@ -53,6 +64,7 @@ export async function GET() {
           teamName: true,
           registrationId: true,
           status: true,
+          degree: true,
           college: true,
           createdAt: true,
           members: { select: { id: true } },
@@ -64,6 +76,8 @@ export async function GET() {
     return NextResponse.json({
       counts: {
         totalTeams,
+        diplomaTeams,
+        ugPgTeams,
         approvedTeams,
         pendingPayments,
         verifiedPayments,

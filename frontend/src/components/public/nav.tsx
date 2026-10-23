@@ -18,8 +18,10 @@ export function PublicNav({ visible = true }: { visible?: boolean } = {}) {
     !!eventState.data &&
     eventState.data.registrationOpen &&
     (!eventState.data.registrationsOpen ||
-      (eventState.data.registrationCapacity > 0 &&
-        eventState.data.currentCount >= eventState.data.registrationCapacity));
+      (eventState.data.isFull !== undefined
+        ? eventState.data.isFull
+        : eventState.data.registrationCapacity > 0 &&
+          eventState.data.currentCount >= eventState.data.registrationCapacity));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
