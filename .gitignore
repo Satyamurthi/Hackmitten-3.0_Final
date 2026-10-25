@@ -42,6 +42,10 @@ yarn-error.log*
 # uploads (user-generated content)
 public/uploads/
 
+# generated output / exports
+backend/output/
+output/
+
 # vercel
 .vercel
 
